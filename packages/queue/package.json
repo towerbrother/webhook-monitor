@@ -1,0 +1,25 @@
+{
+  "name": "@webhook-monitor/queue",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "bullmq": "^5.45.2",
+    "ioredis": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.7",
+    "@webhook-monitor/typescript-config": "workspace:*",
+    "typescript": "5.9.2"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@webhook-monitor/worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@webhook-monitor/shared": "workspace:*",
+    "ioredis": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.7",
+    "@webhook-monitor/typescript-config": "workspace:*",
+    "tsx": "^4.19.3",
+    "typescript": "5.9.2"
+  }
+}

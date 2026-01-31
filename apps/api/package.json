@@ -1,0 +1,24 @@
+{
+  "name": "@webhook-monitor/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@webhook-monitor/shared": "workspace:*",
+    "fastify": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.7",
+    "@webhook-monitor/typescript-config": "workspace:*",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "5.9.2"
+  }
+}

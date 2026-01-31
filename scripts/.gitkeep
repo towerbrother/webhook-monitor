@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+/**
+ * Placeholder scripts directory
+ * Add utility scripts here as the project grows
+ */
+console.log("Scripts directory ready");
