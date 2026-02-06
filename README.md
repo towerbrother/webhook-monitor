@@ -2,6 +2,11 @@
 
 A minimal Turborepo monorepo for backend-focused learning.
 
+## Prerequisites
+
+- Node.js >= 22
+- pnpm 9.0.0
+
 ## Structure
 
 ```
