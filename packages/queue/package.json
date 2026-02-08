@@ -1,5 +1,5 @@
 {
-  "name": "@webhook-monitor/queue",
+  "name": "@repo/queue",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.7",
-    "@webhook-monitor/typescript-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
     "typescript": "5.9.2"
   }
 }

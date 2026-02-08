@@ -1,4 +1,4 @@
-import { APP_NAME } from "@webhook-monitor/shared";
+import { APP_NAME } from "@repo/shared";
 
 export default function HomePage() {
   return (

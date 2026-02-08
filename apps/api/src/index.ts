@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { APP_NAME, type HealthCheckResponse } from "@webhook-monitor/shared";
+import { APP_NAME, type HealthCheckResponse } from "@repo/shared";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const HOST = process.env.HOST ?? "0.0.0.0";

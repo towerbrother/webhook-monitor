@@ -48,7 +48,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
-        run: pnpm --filter @webhook-monitor/db generate
+        run: pnpm --filter @repo/db generate
 
       - name: Type check
         run: pnpm turbo check-types

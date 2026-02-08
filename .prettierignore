@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+pnpm-lock.yaml
+
+# Build outputs
+dist
+build
+.next
+out
+.turbo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Generated files
+.prisma
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+*.pem

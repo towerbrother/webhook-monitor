@@ -1,5 +1,5 @@
 import { Redis } from "ioredis";
-import { APP_NAME } from "@webhook-monitor/shared";
+import { APP_NAME } from "@repo/shared";
 
 const REDIS_HOST = process.env.REDIS_HOST ?? "localhost";
 const REDIS_PORT = parseInt(process.env.REDIS_PORT ?? "6379", 10);
