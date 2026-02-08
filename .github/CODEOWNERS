@@ -1,0 +1,18 @@
+# CODEOWNERS - Defines who gets auto-assigned to PRs
+# Documentation: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Dependency updates and configuration files
+renovate.json @towerbrother
+pnpm-lock.yaml @towerbrother
+pnpm-workspace.yaml @towerbrother
+turbo.json @towerbrother
+
+# CI/CD and automation
+/.github/ @towerbrother
+CICD.md @towerbrother
+
+# Database schema changes
+packages/db/prisma/schema.prisma @towerbrother
+
+# Default owner for everything else
+* @towerbrother

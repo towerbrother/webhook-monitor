@@ -1,0 +1,95 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":enableVulnerabilityAlertsWithLabel(security)"
+  ],
+  "packageRules": [
+    {
+      "description": "Group all pnpm updates together",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["pnpm"],
+      "groupName": "pnpm",
+      "automerge": false
+    },
+    {
+      "description": "Group all Turborepo updates",
+      "matchPackageNames": ["turbo"],
+      "groupName": "turborepo",
+      "automerge": false
+    },
+    {
+      "description": "Group all TypeScript updates",
+      "matchPackageNames": ["typescript", "@types/node"],
+      "groupName": "typescript",
+      "automerge": false
+    },
+    {
+      "description": "Group all ESLint related packages",
+      "matchPackagePatterns": ["^eslint", "^@typescript-eslint/"],
+      "groupName": "eslint packages",
+      "automerge": false
+    },
+    {
+      "description": "Group all Prisma packages",
+      "matchPackagePatterns": ["^@prisma/", "^prisma$"],
+      "groupName": "prisma",
+      "automerge": false
+    },
+    {
+      "description": "Group all BullMQ and Redis packages",
+      "matchPackageNames": ["bullmq", "ioredis"],
+      "groupName": "queue packages",
+      "automerge": false
+    },
+    {
+      "description": "Group all Fastify packages",
+      "matchPackagePatterns": ["^@fastify/", "^fastify$"],
+      "groupName": "fastify packages",
+      "automerge": false
+    },
+    {
+      "description": "Group all Next.js packages",
+      "matchPackageNames": ["next"],
+      "groupName": "next.js",
+      "automerge": false
+    },
+    {
+      "description": "Group all React packages",
+      "matchPackageNames": ["react", "react-dom"],
+      "matchPackagePatterns": ["^@types/react"],
+      "groupName": "react",
+      "automerge": false
+    },
+    {
+      "description": "Automatically merge patch updates for dev dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Pin Node.js to major version 22 (as per your engines requirement)",
+      "matchPackageNames": ["node"],
+      "allowedVersions": ">=22.0.0 <23.0.0"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "assignees": []
+  },
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "schedule": ["before 10am on monday"],
+  "timezone": "UTC",
+  "labels": ["dependencies"],
+  "assignAutoMerge": false,
+  "rangeStrategy": "bump",
+  "semanticCommits": "enabled",
+  "postUpdateOptions": ["pnpmDedupe"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 10am on the first day of the month"]
+  }
+}
