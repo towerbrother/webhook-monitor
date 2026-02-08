@@ -1,5 +1,5 @@
 import { Redis } from "ioredis";
-import { APP_NAME } from "@webhook-monitor/shared";
+import { APP_NAME } from "@repo/shared";
 import { validateEnv } from "./env.js";
 
 const env = validateEnv();
