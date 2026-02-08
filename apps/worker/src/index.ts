@@ -1,8 +1,10 @@
 import { Redis } from "ioredis";
 import { APP_NAME } from "@webhook-monitor/shared";
+import { validateEnv } from "./env.js";
 
-const REDIS_HOST = process.env.REDIS_HOST ?? "localhost";
-const REDIS_PORT = parseInt(process.env.REDIS_PORT ?? "6379", 10);
+const env = validateEnv();
+const REDIS_HOST = env.REDIS_HOST;
+const REDIS_PORT = env.REDIS_PORT;
 
 async function main() {
   console.log(`
