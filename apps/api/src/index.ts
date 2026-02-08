@@ -1,8 +1,10 @@
 import Fastify from "fastify";
 import { APP_NAME, type HealthCheckResponse } from "@webhook-monitor/shared";
+import { validateEnv } from "./env.js";
 
-const PORT = parseInt(process.env.PORT ?? "3001", 10);
-const HOST = process.env.HOST ?? "0.0.0.0";
+const env = validateEnv();
+const PORT = env.PORT;
+const HOST = env.HOST;
 
 async function main() {
   const fastify = Fastify({
