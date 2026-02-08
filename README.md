@@ -1,46 +1,84 @@
 # webhook-monitor
 
-A minimal Turborepo monorepo for backend-focused learning.
+A Turborepo monorepo for webhook monitoring with automated dependency management and CI/CD.
 
 ## Prerequisites
 
 - Node.js >= 22
-- pnpm 9.0.0
+- pnpm 10.28.2 (exact version, enforced)
+- PostgreSQL (local or remote)
+- Redis (local or remote)
 
 ## Structure
 
 ```
-apps/           # Application packages (add your apps here)
-packages/       # Shared packages
-  eslint-config/   # Shared ESLint configuration
-  typescript-config/  # Shared TypeScript configurations
+apps/
+├── api/       # Fastify backend API
+├── worker/    # BullMQ background job processor
+└── web/       # Next.js frontend application
+
+packages/
+├── db/                # Prisma database client
+├── queue/             # BullMQ job queue
+├── shared/            # Shared utilities and types
+├── eslint-config/     # ESLint configurations
+└── typescript-config/ # TypeScript configurations
+
+docs/          # Project documentation
+```
+
+## Quick Start
+
+```bash
+# Install dependencies
+pnpm install
+
+# Set up environment variables
+cp .env.example .env  # (when created)
+
+# Run database migrations
+pnpm --filter @repo/db prisma migrate dev
+
+# Start all development servers
+pnpm dev
 ```
 
 ## Scripts
 
 ```bash
-pnpm install    # Install dependencies
-pnpm dev        # Run all apps in dev mode
-pnpm build      # Build all apps
-pnpm lint       # Lint all packages
+pnpm dev          # Run all apps in dev mode
+pnpm build        # Build all packages
+pnpm lint         # Lint all packages
+pnpm format       # Format code with Prettier
+pnpm check-types  # Run TypeScript checks
 ```
 
-## What was removed
+## Documentation
 
-This repo was scaffolded from `create-turbo` and cleaned up:
+Comprehensive documentation is available in the [`docs/`](./docs) directory:
 
-- **apps/web, apps/docs**: Example Next.js apps (boilerplate)
-- **packages/ui**: Unused React component library
-- **prettier**: Removed from root (add per-package if needed)
-- **volta config**: Removed (use your preferred version manager)
-- **"ui" option in turbo.json**: Removed (default is fine)
-- **Format script**: Removed (add when needed)
+- **[docs/README.md](./docs/README.md)** - Documentation index
+- **[docs/automation.md](./docs/automation.md)** - Renovate, CI/CD, branch protection
+- **[docs/infrastructure.md](./docs/infrastructure.md)** - Deployment, database, monitoring
+- **[docs/workflows.md](./docs/workflows.md)** - Git strategy, PR process, development
 
-## Turborepo
+### Quick Links
 
-Pipelines defined in `turbo.json`:
+| Topic                | Document                                                                  |
+| -------------------- | ------------------------------------------------------------------------- |
+| Setting up Renovate  | [docs/automation.md](./docs/automation.md#dependency-management-renovate) |
+| Deployment strategy  | [docs/infrastructure.md](./docs/infrastructure.md#deployment-strategy)    |
+| Pull request process | [docs/workflows.md](./docs/workflows.md#pull-request-process)             |
+| Troubleshooting      | [docs/workflows.md](./docs/workflows.md#troubleshooting)                  |
 
-- `dev` – persistent, not cached
-- `build` – outputs to `dist/`
-- `lint` – no dependencies
-- `typecheck` – no dependencies
+## Architecture
+
+This is a monorepo with three runtime boundaries:
+
+- **apps/api** - HTTP API server (Fastify)
+- **apps/worker** - Background job processor (no HTTP)
+- **apps/web** - Frontend application (Next.js)
+
+**Key rule:** Apps cannot import from each other. Shared code lives in `packages/`.
+
+See [`AGENTS.md`](./AGENTS.md) for detailed architecture rules and guidelines.
