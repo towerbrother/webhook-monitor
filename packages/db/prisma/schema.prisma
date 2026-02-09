@@ -22,12 +22,9 @@ model Project {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   endpoints WebhookEndpoint[]
   events    Event[]
-
-  @@index([createdAt])
 }
 
 // ============================================================================
@@ -45,13 +42,11 @@ model WebhookEndpoint {
   name      String
   projectId String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   events  Event[]
 
   @@index([projectId])
-  @@index([createdAt])
 }
 
 // ============================================================================
@@ -70,15 +65,13 @@ model Event {
   projectId  String // Denormalized for query performance
   method     String
   headers    Json
-  body       Json?
+  body       Json? // Nullable - webhooks may have empty body
   receivedAt DateTime @default(now())
 
   endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
   project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([endpointId, receivedAt(sort: Desc)])
-  @@index([projectId, receivedAt(sort: Desc)])
-  @@index([receivedAt(sort: Desc)])
+  @@index([projectId, endpointId])
 }
 
 // ============================================================================
