@@ -17,11 +17,13 @@ datasource db {
 // Ownership: Owns WebhookEndpoint and Event
 // Invariants:
 //   - All child entities must belong to exactly one project
+//   - projectKey is unique and used for API authentication
 //
 model Project {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  name       String
+  projectKey String   @unique // Secret key for API authentication
+  createdAt  DateTime @default(now())
 
   endpoints WebhookEndpoint[]
   events    Event[]

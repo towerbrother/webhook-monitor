@@ -11,6 +11,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@repo/db": "workspace:*",
     "@repo/shared": "workspace:*",
     "fastify": "^5.2.1",
     "zod": "^4.3.6"
