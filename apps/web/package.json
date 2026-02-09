@@ -1,5 +1,5 @@
 {
-  "name": "@webhook-monitor/web",
+  "name": "@repo/web",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@webhook-monitor/shared": "workspace:*",
+    "@repo/shared": "workspace:*",
     "next": "^15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -20,7 +20,7 @@
     "@types/node": "^22.19.7",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
-    "@webhook-monitor/typescript-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
     "typescript": "5.9.2"
   }
 }
