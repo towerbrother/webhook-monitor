@@ -10,9 +10,84 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Schema will be added in Week 2
-// Placeholder model to ensure Prisma can generate
-model Placeholder {
+// ============================================================================
+// PROJECT - Root aggregate for multi-tenancy
+// ============================================================================
+// Responsibility: Tenant boundary that owns all webhook endpoints and events
+// Ownership: Owns WebhookEndpoint and Event
+// Invariants:
+//   - All child entities must belong to exactly one project
+//
+model Project {
   id        String   @id @default(cuid())
+  name      String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  endpoints WebhookEndpoint[]
+  events    Event[]
+
+  @@index([createdAt])
 }
+
+// ============================================================================
+// WEBHOOK ENDPOINT - Configured destination for receiving webhooks
+// ============================================================================
+// Responsibility: Defines WHERE webhooks are accepted (unique URL)
+// Ownership: Owned by Project, owns Event
+// Invariants:
+//   - Must belong to exactly one project
+//   - URL is globally unique and immutable
+//
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  url       String   @unique // Unique identifier (e.g., "ep_abc123")
+  name      String
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  events  Event[]
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// EVENT - Immutable record of a received webhook
+// ============================================================================
+// Responsibility: Captures complete HTTP request data (headers, body, method)
+// Ownership: Owned by WebhookEndpoint AND Project (double-scoped)
+// Invariants:
+//   - Must belong to exactly one endpoint and one project
+//   - event.projectId MUST equal event.endpoint.projectId (enforced in app)
+//   - Data is immutable once created (append-only log)
+//
+model Event {
+  id         String   @id @default(cuid())
+  endpointId String
+  projectId  String // Denormalized for query performance
+  method     String
+  headers    Json
+  body       Json?
+  receivedAt DateTime @default(now())
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, receivedAt(sort: Desc)])
+  @@index([projectId, receivedAt(sort: Desc)])
+  @@index([receivedAt(sort: Desc)])
+}
+
+// ============================================================================
+// RELATIONSHIPS
+// ============================================================================
+// Project (1) ──< has many >── (N) WebhookEndpoint
+//    │                               │
+//    └─< has many >──────────< belongs to >── Event
+//
+// Cascade deletion:
+//   - Delete Project → deletes WebhookEndpoints → deletes Events
+//   - Delete WebhookEndpoint → deletes Events
