@@ -26,15 +26,15 @@
     },
     {
       "description": "Group all ESLint related packages",
-      "matchPackagePatterns": ["^eslint", "^@typescript-eslint/"],
       "groupName": "eslint packages",
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": ["/^eslint/", "/^@typescript-eslint//"]
     },
     {
       "description": "Group all Prisma packages",
-      "matchPackagePatterns": ["^@prisma/", "^prisma$"],
       "groupName": "prisma",
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": ["/^@prisma//", "/^prisma$/"]
     },
     {
       "description": "Group all BullMQ and Redis packages",
@@ -44,9 +44,9 @@
     },
     {
       "description": "Group all Fastify packages",
-      "matchPackagePatterns": ["^@fastify/", "^fastify$"],
       "groupName": "fastify packages",
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": ["/^@fastify//", "/^fastify$/"]
     },
     {
       "description": "Group all Next.js packages",
@@ -56,8 +56,7 @@
     },
     {
       "description": "Group all React packages",
-      "matchPackageNames": ["react", "react-dom"],
-      "matchPackagePatterns": ["^@types/react"],
+      "matchPackageNames": ["react", "react-dom", "/^@types/react/"],
       "groupName": "react",
       "automerge": false
     },
@@ -84,7 +83,6 @@
   "schedule": ["before 10am on monday"],
   "timezone": "UTC",
   "labels": ["dependencies"],
-  "assignAutoMerge": false,
   "rangeStrategy": "bump",
   "semanticCommits": "enabled",
   "postUpdateOptions": ["pnpmDedupe"],
