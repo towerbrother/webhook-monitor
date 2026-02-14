@@ -54,6 +54,9 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@22.19.7)(jiti@2.6.1)(tsx@4.21.0)
 
   apps/web:
     dependencies:
@@ -132,6 +135,9 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@22.19.7)(jiti@2.6.1)(tsx@4.21.0)
 
   packages/eslint-config:
     devDependencies:
@@ -201,15 +207,6 @@ importers:
         version: 5.9.2
 
   packages/typescript-config: {}
-
-  scripts:
-    dependencies:
-      '@prisma/client':
-        specifier: ^6.6.0
-        version: 6.19.2(prisma@6.19.2(typescript@5.9.3))(typescript@5.9.3)
-      '@repo/db':
-        specifier: workspace:*
-        version: link:../packages/db
 
 packages:
 
@@ -2890,11 +2887,6 @@ snapshots:
       prisma: 6.19.2(typescript@5.9.2)
       typescript: 5.9.2
 
-  '@prisma/client@6.19.2(prisma@6.19.2(typescript@5.9.3))(typescript@5.9.3)':
-    optionalDependencies:
-      prisma: 6.19.2(typescript@5.9.3)
-      typescript: 5.9.3
-
   '@prisma/config@6.19.2':
     dependencies:
       c12: 3.1.0
@@ -4394,16 +4386,6 @@ snapshots:
       typescript: 5.9.2
     transitivePeerDependencies:
       - magicast
-
-  prisma@6.19.2(typescript@5.9.3):
-    dependencies:
-      '@prisma/config': 6.19.2
-      '@prisma/engines': 6.19.2
-    optionalDependencies:
-      typescript: 5.9.3
-    transitivePeerDependencies:
-      - magicast
-    optional: true
 
   process-warning@4.0.1: {}
 

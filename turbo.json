@@ -20,7 +20,7 @@
       "cache": false
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^test"],
       "cache": false,
       "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT"]
     }

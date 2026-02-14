@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "check-types": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@repo/db": "workspace:*",
@@ -21,6 +23,7 @@
     "@repo/typescript-config": "workspace:*",
     "pino-pretty": "^13.0.0",
     "tsx": "^4.19.3",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^4.0.18"
   }
 }
