@@ -1,0 +1,120 @@
+/**
+ * Test helpers for @repo/db
+ *
+ * Factory functions for creating test data with sensible defaults.
+ * These helpers ensure consistent test data across all test files.
+ */
+
+import { prisma } from "../index.js";
+import type { Project, WebhookEndpoint, Event } from "@prisma/client";
+
+/**
+ * Generate a unique ID for test data
+ * Uses timestamp + random suffix to avoid collisions
+ */
+export function uniqueId(prefix = "test"): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Generate a unique project key for testing
+ */
+export function uniqueProjectKey(): string {
+  return `pk_test_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+}
+
+/**
+ * Create a test project with sensible defaults
+ */
+export async function createTestProject(
+  overrides: Partial<Omit<Project, "id" | "createdAt">> = {}
+): Promise<Project> {
+  return prisma.project.create({
+    data: {
+      name: overrides.name ?? `Test Project ${uniqueId()}`,
+      projectKey: overrides.projectKey ?? uniqueProjectKey(),
+    },
+  });
+}
+
+/**
+ * Create a test webhook endpoint with sensible defaults
+ */
+export async function createTestEndpoint(
+  projectId: string,
+  overrides: Partial<
+    Omit<WebhookEndpoint, "id" | "createdAt" | "projectId">
+  > = {}
+): Promise<WebhookEndpoint> {
+  return prisma.webhookEndpoint.create({
+    data: {
+      projectId,
+      url: overrides.url ?? `https://example.com/webhook/${uniqueId()}`,
+      name: overrides.name ?? `Test Endpoint ${uniqueId()}`,
+    },
+  });
+}
+
+/**
+ * Create a test event with sensible defaults
+ */
+export async function createTestEvent(
+  projectId: string,
+  endpointId: string,
+  overrides: Partial<
+    Omit<Event, "id" | "receivedAt" | "projectId" | "endpointId">
+  > = {}
+): Promise<Event> {
+  return prisma.event.create({
+    data: {
+      projectId,
+      endpointId,
+      method: overrides.method ?? "POST",
+      headers: overrides.headers ?? { "content-type": "application/json" },
+      body: overrides.body ?? { test: true },
+      idempotencyKey: overrides.idempotencyKey ?? null,
+    },
+  });
+}
+
+/**
+ * Create a complete test scenario with project, endpoint, and event
+ * Useful for tests that need a full data hierarchy
+ */
+export async function createTestScenario(): Promise<{
+  project: Project;
+  endpoint: WebhookEndpoint;
+  event: Event;
+}> {
+  const project = await createTestProject();
+  const endpoint = await createTestEndpoint(project.id);
+  const event = await createTestEvent(project.id, endpoint.id);
+
+  return { project, endpoint, event };
+}
+
+/**
+ * Assert that a Prisma operation throws a unique constraint violation
+ * Useful for testing idempotency key uniqueness
+ */
+export function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
+
+/**
+ * Assert that a Prisma operation throws a foreign key constraint violation
+ * Useful for testing referential integrity
+ */
+export function isForeignKeyConstraintError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "P2003"
+  );
+}

@@ -16,7 +16,9 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "check-types": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0"
