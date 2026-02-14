@@ -29,6 +29,9 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@repo/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       '@repo/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -193,6 +196,9 @@ importers:
       typescript:
         specifier: 5.9.2
         version: 5.9.2
+      vitest:
+        specifier: ^4.0.18
+        version: 4.0.18(@types/node@22.19.7)(jiti@2.6.1)(tsx@4.21.0)
 
   packages/shared:
     devDependencies:
