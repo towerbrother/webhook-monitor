@@ -12,6 +12,14 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
+  REDIS_HOST: z.string().default("localhost"),
+  REDIS_PORT: z
+    .string()
+    .default("6379")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0 && val < 65536, {
+      message: "REDIS_PORT must be a valid port number (1-65535)",
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;

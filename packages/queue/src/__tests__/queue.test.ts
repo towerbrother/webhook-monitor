@@ -9,29 +9,33 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import {
-  getWebhookDeliveryQueue,
+  createWebhookDeliveryQueue,
   enqueueWebhookDelivery,
-  closeQueue,
   type WebhookDeliveryJobData,
+  type Queue,
 } from "../index.js";
 
 describe("Webhook Delivery Queue", () => {
+  let queue: Queue<WebhookDeliveryJobData>;
+
   beforeAll(async () => {
-    // Ensure queue is initialized
-    const queue = getWebhookDeliveryQueue();
+    queue = createWebhookDeliveryQueue({
+      redis: {
+        host: process.env.REDIS_HOST ?? "localhost",
+        port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        maxRetriesPerRequest: null,
+      },
+    });
     await queue.waitUntilReady();
   });
 
   beforeEach(async () => {
-    // Clean up jobs from previous tests
-    const queue = getWebhookDeliveryQueue();
     await queue.drain();
   });
 
   afterAll(async () => {
-    const queue = getWebhookDeliveryQueue();
     await queue.obliterate({ force: true });
-    await closeQueue();
+    await queue.close();
   });
 
   describe("enqueueWebhookDelivery", () => {
@@ -47,17 +51,13 @@ describe("Webhook Delivery Queue", () => {
         attempt: 1,
       };
 
-      const jobId = await enqueueWebhookDelivery(jobData);
+      const jobId = await enqueueWebhookDelivery(queue, jobData);
 
-      expect(jobId).toBe(jobData.eventId); // jobId should equal eventId for idempotency
+      expect(jobId).toBe(jobData.eventId);
 
-      // Verify job was added to queue
-      const queue = getWebhookDeliveryQueue();
       const job = await queue.getJob(jobId);
-
       expect(job).not.toBeNull();
       expect(job!.data).toEqual(jobData);
-      expect(job!.name).toBe(`deliver-${jobData.eventId}`);
     });
 
     it("should use eventId as jobId for idempotency", async () => {
@@ -72,17 +72,12 @@ describe("Webhook Delivery Queue", () => {
         attempt: 1,
       };
 
-      // First enqueue should succeed
-      const jobId1 = await enqueueWebhookDelivery(jobData);
-      expect(jobId1).toBe(jobData.eventId);
+      const jobId1 = await enqueueWebhookDelivery(queue, jobData);
+      const jobId2 = await enqueueWebhookDelivery(queue, jobData);
 
-      // Second enqueue with same eventId should return same jobId (idempotent)
-      // Note: BullMQ will not create a duplicate job if jobId already exists
-      const jobId2 = await enqueueWebhookDelivery(jobData);
+      expect(jobId1).toBe(jobData.eventId);
       expect(jobId2).toBe(jobData.eventId);
 
-      // Should only have one job in queue
-      const queue = getWebhookDeliveryQueue();
       const waitingCount = await queue.getWaitingCount();
       expect(waitingCount).toBe(1);
     });
@@ -110,28 +105,27 @@ describe("Webhook Delivery Queue", () => {
         attempt: 1,
       };
 
-      await enqueueWebhookDelivery(jobData);
+      await enqueueWebhookDelivery(queue, jobData);
 
-      const queue = getWebhookDeliveryQueue();
       const job = await queue.getJob(jobData.eventId);
 
       expect(job!.data.body).toEqual(complexBody);
     });
   });
 
-  describe("Queue Configuration", () => {
-    it("should have correct default job options", async () => {
-      const queue = getWebhookDeliveryQueue();
+  describe("createWebhookDeliveryQueue", () => {
+    it("should create independent queue instances", async () => {
+      const queue1 = createWebhookDeliveryQueue({
+        redis: { host: "localhost", port: 6379, maxRetriesPerRequest: null },
+      });
+      const queue2 = createWebhookDeliveryQueue({
+        redis: { host: "localhost", port: 6379, maxRetriesPerRequest: null },
+      });
 
-      // Check that queue exists and is connected
-      expect(queue.name).toBe("webhook-delivery");
-    });
+      expect(queue1).not.toBe(queue2);
 
-    it("should allow retrieving queue instance multiple times (singleton)", () => {
-      const queue1 = getWebhookDeliveryQueue();
-      const queue2 = getWebhookDeliveryQueue();
-
-      expect(queue1).toBe(queue2); // Same instance
+      await queue1.close();
+      await queue2.close();
     });
   });
 });

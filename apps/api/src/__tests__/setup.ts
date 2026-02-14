@@ -6,12 +6,23 @@
  */
 
 import { beforeAll, afterAll, beforeEach } from "vitest";
-import { prisma } from "@repo/db";
+import { createPrismaClient } from "@repo/db";
+import type { PrismaClient } from "@repo/db";
+
+let prisma: PrismaClient;
+
+export function getTestPrisma(): PrismaClient {
+  if (!prisma) {
+    throw new Error("Test prisma client not initialized");
+  }
+  return prisma;
+}
 
 /**
  * Connect to database before all tests
  */
 beforeAll(async () => {
+  prisma = createPrismaClient({ logQueries: false });
   await prisma.$connect();
 });
 

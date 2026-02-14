@@ -12,21 +12,43 @@
  * - Idempotency key handling
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../app.js";
-import { prisma } from "@repo/db";
+import { getTestPrisma } from "./setup.js";
 import {
-  createTestProject,
-  createTestEndpoint,
-  uniqueProjectKey,
-  uniqueId,
-} from "@repo/db/testing";
+  createWebhookDeliveryQueue,
+  type Queue,
+  type WebhookDeliveryJobData,
+} from "@repo/queue";
+import { createTestProject, createTestEndpoint } from "@repo/db/testing";
 
 let app: FastifyInstance;
+let queue: Queue<WebhookDeliveryJobData>;
+
+beforeAll(async () => {
+  const prisma = getTestPrisma();
+
+  queue = createWebhookDeliveryQueue({
+    redis: {
+      host: process.env.REDIS_HOST ?? "localhost",
+      port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+      maxRetriesPerRequest: null,
+    },
+  });
+  await queue.waitUntilReady();
+
+  app = await buildApp({ prisma, queue, logger: false });
+});
 
 beforeEach(async () => {
-  app = await buildApp({ logger: false });
+  await queue.drain();
+});
+
+afterAll(async () => {
+  await queue.obliterate({ force: true });
+  await queue.close();
+  await app.close();
 });
 
 describe("Webhook Ingestion API", () => {
@@ -61,8 +83,9 @@ describe("Webhook Ingestion API", () => {
     });
 
     it("should accept requests with valid project key", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const response = await app.inject({
         method: "POST",
@@ -82,12 +105,13 @@ describe("Webhook Ingestion API", () => {
 
   describe("Endpoint Ownership (Tenant Isolation)", () => {
     it("should reject access to endpoint belonging to another project", async () => {
+      const prisma = getTestPrisma();
       // Create two projects
-      const project1 = await createTestProject();
-      const project2 = await createTestProject();
+      const project1 = await createTestProject(prisma);
+      const project2 = await createTestProject(prisma);
 
       // Create endpoint for project1
-      const endpoint = await createTestEndpoint(project1.id);
+      const endpoint = await createTestEndpoint(prisma, project1.id);
 
       // Try to access project1's endpoint using project2's key
       const response = await app.inject({
@@ -108,8 +132,9 @@ describe("Webhook Ingestion API", () => {
     });
 
     it("should allow access to own endpoint", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const response = await app.inject({
         method: "POST",
@@ -126,7 +151,8 @@ describe("Webhook Ingestion API", () => {
     });
 
     it("should return 404 for non-existent endpoint", async () => {
-      const project = await createTestProject();
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
 
       const response = await app.inject({
         method: "POST",
@@ -143,8 +169,9 @@ describe("Webhook Ingestion API", () => {
 
   describe("Event Persistence", () => {
     it("should create event record in database", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const payload = { webhook: "data", nested: { value: 123 } };
 
@@ -174,8 +201,9 @@ describe("Webhook Ingestion API", () => {
     });
 
     it("should store request headers", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const response = await app.inject({
         method: "POST",
@@ -197,8 +225,9 @@ describe("Webhook Ingestion API", () => {
     });
 
     it("should handle empty body", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const response = await app.inject({
         method: "POST",
@@ -215,8 +244,9 @@ describe("Webhook Ingestion API", () => {
 
   describe("Response Format", () => {
     it("should return eventId and receivedAt timestamp", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const response = await app.inject({
         method: "POST",
@@ -240,7 +270,8 @@ describe("Webhook Ingestion API", () => {
 
   describe("Project-wide Webhook", () => {
     it("should accept webhook at /webhooks endpoint", async () => {
-      const project = await createTestProject();
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
 
       const response = await app.inject({
         method: "POST",

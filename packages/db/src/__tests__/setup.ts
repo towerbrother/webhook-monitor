@@ -7,7 +7,24 @@
  */
 
 import { beforeAll, afterAll, beforeEach } from "vitest";
-import { prisma } from "../index.js";
+import { createPrismaClient } from "../index.js";
+import type { PrismaClient } from "@prisma/client";
+
+// Test database client instance
+let prisma: PrismaClient;
+
+/**
+ * Get the test database client
+ * Must be called after beforeAll has run
+ */
+export function getTestPrisma(): PrismaClient {
+  if (!prisma) {
+    throw new Error(
+      "Test prisma client not initialized. Ensure setup.ts beforeAll has run."
+    );
+  }
+  return prisma;
+}
 
 /**
  * Clean up database to ensure test isolation
@@ -23,6 +40,7 @@ async function cleanDatabase(): Promise<void> {
  * Verify database connection before running any tests
  */
 beforeAll(async () => {
+  prisma = createPrismaClient({ logQueries: false });
   try {
     await prisma.$connect();
   } catch (error) {
