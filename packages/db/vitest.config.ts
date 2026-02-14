@@ -9,10 +9,14 @@ export default defineProject({
     testTimeout: 30000,
     hookTimeout: 30000,
 
-    // Run tests sequentially to avoid database conflicts
+    // Run tests sequentially - both within files and across files
+    // This prevents database conflicts between tests
     sequence: {
       concurrent: false,
     },
+
+    // Run test files sequentially (not in parallel)
+    fileParallelism: false,
 
     // Include patterns
     include: ["src/**/*.test.ts"],

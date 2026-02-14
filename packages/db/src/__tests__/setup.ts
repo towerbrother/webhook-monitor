@@ -6,8 +6,18 @@
  * - Test isolation (cleanup between tests)
  */
 
-import { beforeAll, afterAll, afterEach } from "vitest";
+import { beforeAll, afterAll, beforeEach } from "vitest";
 import { prisma } from "../index.js";
+
+/**
+ * Clean up database to ensure test isolation
+ * Deletes in correct order to respect foreign key constraints
+ */
+async function cleanDatabase(): Promise<void> {
+  await prisma.event.deleteMany();
+  await prisma.webhookEndpoint.deleteMany();
+  await prisma.project.deleteMany();
+}
 
 /**
  * Verify database connection before running any tests
@@ -26,19 +36,16 @@ beforeAll(async () => {
 });
 
 /**
- * Clean up database after each test to ensure isolation
- * Deletes in correct order to respect foreign key constraints
+ * Clean up database before each test to ensure isolation
  */
-afterEach(async () => {
-  // Delete in reverse dependency order
-  await prisma.event.deleteMany();
-  await prisma.webhookEndpoint.deleteMany();
-  await prisma.project.deleteMany();
+beforeEach(async () => {
+  await cleanDatabase();
 });
 
 /**
  * Disconnect from database after all tests complete
  */
 afterAll(async () => {
+  await cleanDatabase();
   await prisma.$disconnect();
 });

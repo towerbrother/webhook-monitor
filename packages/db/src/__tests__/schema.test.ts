@@ -5,6 +5,8 @@
  * - Foreign key constraints
  * - Unique constraints (idempotency)
  * - Cascade delete behavior
+ * - Required field constraints (NOT NULL)
+ * - Raw payload storage (JSON fields)
  */
 
 import { describe, it, expect } from "vitest";
@@ -189,6 +191,177 @@ describe("Schema Constraints", () => {
       });
 
       expect(deletedEvent).toBeNull();
+    });
+  });
+
+  describe("Raw Payload Storage", () => {
+    it("should store and retrieve complex headers JSON", async () => {
+      const project = await createTestProject();
+      const endpoint = await createTestEndpoint(project.id);
+
+      const complexHeaders = {
+        "content-type": "application/json",
+        "x-custom-header": "value",
+        "x-array-header": ["value1", "value2"],
+        "x-nested": { key: "value", nested: { deep: true } },
+      };
+
+      const event = await createTestEvent(project.id, endpoint.id, {
+        headers: complexHeaders,
+      });
+
+      const retrieved = await prisma.event.findUnique({
+        where: { id: event.id },
+      });
+
+      expect(retrieved?.headers).toEqual(complexHeaders);
+    });
+
+    it("should store and retrieve complex body JSON", async () => {
+      const project = await createTestProject();
+      const endpoint = await createTestEndpoint(project.id);
+
+      const complexBody = {
+        action: "webhook.received",
+        data: {
+          id: 12345,
+          nested: {
+            array: [1, 2, 3],
+            object: { key: "value" },
+          },
+        },
+        timestamp: "2024-01-01T00:00:00Z",
+      };
+
+      const event = await createTestEvent(project.id, endpoint.id, {
+        body: complexBody,
+      });
+
+      const retrieved = await prisma.event.findUnique({
+        where: { id: event.id },
+      });
+
+      expect(retrieved?.body).toEqual(complexBody);
+    });
+
+    it("should allow null body (webhooks may have empty body)", async () => {
+      const project = await createTestProject();
+      const endpoint = await createTestEndpoint(project.id);
+
+      const event = await createTestEvent(project.id, endpoint.id, {
+        body: null,
+      });
+
+      const retrieved = await prisma.event.findUnique({
+        where: { id: event.id },
+      });
+
+      expect(retrieved?.body).toBeNull();
+    });
+
+    it("should preserve exact JSON structure without modification", async () => {
+      const project = await createTestProject();
+      const endpoint = await createTestEndpoint(project.id);
+
+      // Test edge cases: empty objects, empty arrays, special characters
+      const edgeCaseBody = {
+        emptyObject: {},
+        emptyArray: [],
+        specialChars: 'hello\nworld\t"quoted"',
+        unicode: "日本語 🎉",
+        numbers: { int: 42, float: 3.14, negative: -1, zero: 0 },
+        booleans: { t: true, f: false },
+        nullValue: null,
+      };
+
+      const event = await createTestEvent(project.id, endpoint.id, {
+        body: edgeCaseBody,
+      });
+
+      const retrieved = await prisma.event.findUnique({
+        where: { id: event.id },
+      });
+
+      expect(retrieved?.body).toEqual(edgeCaseBody);
+    });
+  });
+
+  describe("Required Field Constraints", () => {
+    it("should require name for Project", async () => {
+      // Use type assertion to bypass TypeScript and test database constraint
+      const invalidData = { projectKey: uniqueId("pk") } as Parameters<
+        typeof prisma.project.create
+      >[0]["data"];
+
+      await expect(
+        prisma.project.create({ data: invalidData })
+      ).rejects.toThrow();
+    });
+
+    it("should require projectKey for Project", async () => {
+      const invalidData = { name: "Test Project" } as Parameters<
+        typeof prisma.project.create
+      >[0]["data"];
+
+      await expect(
+        prisma.project.create({ data: invalidData })
+      ).rejects.toThrow();
+    });
+
+    it("should require url for WebhookEndpoint", async () => {
+      const project = await createTestProject();
+
+      const invalidData = {
+        name: "Test Endpoint",
+        projectId: project.id,
+      } as Parameters<typeof prisma.webhookEndpoint.create>[0]["data"];
+
+      await expect(
+        prisma.webhookEndpoint.create({ data: invalidData })
+      ).rejects.toThrow();
+    });
+
+    it("should require name for WebhookEndpoint", async () => {
+      const project = await createTestProject();
+
+      const invalidData = {
+        url: `https://example.com/${uniqueId()}`,
+        projectId: project.id,
+      } as Parameters<typeof prisma.webhookEndpoint.create>[0]["data"];
+
+      await expect(
+        prisma.webhookEndpoint.create({ data: invalidData })
+      ).rejects.toThrow();
+    });
+
+    it("should require method for Event", async () => {
+      const project = await createTestProject();
+      const endpoint = await createTestEndpoint(project.id);
+
+      const invalidData = {
+        projectId: project.id,
+        endpointId: endpoint.id,
+        headers: {},
+      } as Parameters<typeof prisma.event.create>[0]["data"];
+
+      await expect(
+        prisma.event.create({ data: invalidData })
+      ).rejects.toThrow();
+    });
+
+    it("should require headers for Event", async () => {
+      const project = await createTestProject();
+      const endpoint = await createTestEndpoint(project.id);
+
+      const invalidData = {
+        projectId: project.id,
+        endpointId: endpoint.id,
+        method: "POST",
+      } as Parameters<typeof prisma.event.create>[0]["data"];
+
+      await expect(
+        prisma.event.create({ data: invalidData })
+      ).rejects.toThrow();
     });
   });
 });

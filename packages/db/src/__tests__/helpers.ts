@@ -5,7 +5,7 @@
  * These helpers ensure consistent test data across all test files.
  */
 
-import { prisma } from "../index.js";
+import { prisma, Prisma } from "../index.js";
 import type { Project, WebhookEndpoint, Event } from "@prisma/client";
 
 /**
@@ -65,14 +65,23 @@ export async function createTestEvent(
     Omit<Event, "id" | "receivedAt" | "projectId" | "endpointId">
   > = {}
 ): Promise<Event> {
+  // Determine body value, converting null to Prisma.JsonNull
+  const bodyValue =
+    "body" in overrides
+      ? overrides.body === null
+        ? Prisma.JsonNull
+        : overrides.body
+      : { test: true };
+
   return prisma.event.create({
     data: {
       projectId,
       endpointId,
       method: overrides.method ?? "POST",
       headers: overrides.headers ?? { "content-type": "application/json" },
-      body: overrides.body ?? { test: true },
-      idempotencyKey: overrides.idempotencyKey ?? null,
+      body: bodyValue,
+      idempotencyKey:
+        "idempotencyKey" in overrides ? overrides.idempotencyKey : null,
     },
   });
 }
