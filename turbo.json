@@ -18,6 +18,11 @@
     },
     "generate": {
       "cache": false
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "cache": false,
+      "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT"]
     }
   }
 }

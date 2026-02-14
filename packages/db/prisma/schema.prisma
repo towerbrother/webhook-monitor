@@ -60,19 +60,22 @@ model WebhookEndpoint {
 //   - Must belong to exactly one endpoint and one project
 //   - event.projectId MUST equal event.endpoint.projectId (enforced in app)
 //   - Data is immutable once created (append-only log)
+//   - idempotencyKey is unique per project (prevents duplicate events)
 //
 model Event {
-  id         String   @id @default(cuid())
-  endpointId String
-  projectId  String // Denormalized for query performance
-  method     String
-  headers    Json
-  body       Json? // Nullable - webhooks may have empty body
-  receivedAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  endpointId     String
+  projectId      String   // Denormalized for query performance
+  idempotencyKey String?  // Optional key for deduplication (unique per project)
+  method         String
+  headers        Json
+  body           Json?    // Nullable - webhooks may have empty body
+  receivedAt     DateTime @default(now())
 
   endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
   project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  @@unique([projectId, idempotencyKey])
   @@index([projectId, endpointId])
 }
 

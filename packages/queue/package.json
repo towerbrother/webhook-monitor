@@ -11,7 +11,9 @@
   },
   "scripts": {
     "check-types": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "bullmq": "^5.45.2",
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^22.19.7",
     "@repo/typescript-config": "workspace:*",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^4.0.18"
   }
 }

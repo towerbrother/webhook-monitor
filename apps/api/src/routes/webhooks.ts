@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Prisma } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
 import { prisma } from "@repo/db";
+import { enqueueWebhookDelivery } from "@repo/queue";
 
 /**
  * Webhook ingestion routes
@@ -47,6 +48,25 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
         headers: request.headers as Prisma.InputJsonValue,
         body: (request.body as Prisma.InputJsonValue) ?? Prisma.JsonNull,
       },
+    });
+
+    // Enqueue delivery job (fire-and-forget, don't block response)
+    // In production, consider handling enqueue failures
+    enqueueWebhookDelivery({
+      eventId: event.id,
+      projectId: project.id,
+      endpointId: endpoint.id,
+      url: endpoint.url,
+      method: request.method,
+      headers: request.headers as Record<string, unknown>,
+      body: request.body,
+      attempt: 1,
+    }).catch((err: unknown) => {
+      // Log error but don't fail the request
+      fastify.log.error(
+        { err, eventId: event.id },
+        "Failed to enqueue webhook delivery"
+      );
     });
 
     return reply.status(201).send({

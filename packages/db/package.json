@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./src/__tests__/helpers.ts",
+      "default": "./src/__tests__/helpers.ts"
     }
   },
   "scripts": {
@@ -16,7 +20,9 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "check-types": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0"
@@ -25,6 +31,7 @@
     "@types/node": "^22.19.7",
     "@repo/typescript-config": "workspace:*",
     "prisma": "^6.6.0",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "^4.0.18"
   }
 }

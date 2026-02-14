@@ -1,14 +1,13 @@
-import Fastify from "fastify";
-import { APP_NAME, type HealthCheckResponse } from "@repo/shared";
+import { APP_NAME } from "@repo/shared";
 import { validateEnv } from "./env.js";
-import { webhookRoutes } from "./routes/webhooks.js";
+import { buildApp } from "./app.js";
 
 const env = validateEnv();
 const PORT = env.PORT;
 const HOST = env.HOST;
 
 async function main() {
-  const fastify = Fastify({
+  const fastify = await buildApp({
     logger: {
       level: "info",
       transport: {
@@ -19,18 +18,6 @@ async function main() {
       },
     },
   });
-
-  // Health check endpoint
-  fastify.get("/health", async (): Promise<HealthCheckResponse> => {
-    return {
-      status: "ok",
-      timestamp: new Date().toISOString(),
-      service: `${APP_NAME}-api`,
-    };
-  });
-
-  // Register webhook routes
-  await fastify.register(webhookRoutes);
 
   try {
     await fastify.listen({ port: PORT, host: HOST });
