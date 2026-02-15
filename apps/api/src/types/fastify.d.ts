@@ -3,7 +3,7 @@
 // It enables TypeScript to recognize the prisma database client and queue instance
 // on the Fastify app instance, as well as project data attached to incoming requests.
 
-import type { Project, PrismaClient, PrismaClient } from "@repo/db";
+import type { Project, PrismaClient } from "@repo/db";
 import type { Queue, WebhookDeliveryJobData } from "@repo/queue";
 
 declare module "fastify" {
