@@ -1,16 +1,5 @@
-/**
- * Schema constraint tests for @repo/db
- *
- * These tests verify that database-level invariants are enforced:
- * - Foreign key constraints
- * - Unique constraints (idempotency)
- * - Cascade delete behavior
- * - Required field constraints (NOT NULL)
- * - Raw payload storage (JSON fields)
- */
-
 import { describe, it, expect } from "vitest";
-import { prisma } from "../index.js";
+import { getTestPrisma } from "./setup.js";
 import {
   createTestProject,
   createTestEndpoint,
@@ -23,7 +12,8 @@ import {
 describe("Schema Constraints", () => {
   describe("Project", () => {
     it("should create a project successfully", async () => {
-      const project = await createTestProject();
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
 
       expect(project.id).toBeDefined();
       expect(project.name).toBeDefined();
@@ -32,11 +22,12 @@ describe("Schema Constraints", () => {
     });
 
     it("should enforce unique projectKey constraint", async () => {
+      const prisma = getTestPrisma();
       const projectKey = `pk_unique_${uniqueId()}`;
 
-      await createTestProject({ projectKey });
+      await createTestProject(prisma, { projectKey });
 
-      await expect(createTestProject({ projectKey })).rejects.toSatisfy(
+      await expect(createTestProject(prisma, { projectKey })).rejects.toSatisfy(
         isUniqueConstraintError
       );
     });
@@ -44,36 +35,40 @@ describe("Schema Constraints", () => {
 
   describe("WebhookEndpoint", () => {
     it("should create an endpoint linked to a project", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       expect(endpoint.id).toBeDefined();
       expect(endpoint.projectId).toBe(project.id);
     });
 
     it("should reject endpoint creation with invalid projectId", async () => {
+      const prisma = getTestPrisma();
       await expect(
-        createTestEndpoint("non_existent_project_id")
+        createTestEndpoint(prisma, "non_existent_project_id")
       ).rejects.toSatisfy(isForeignKeyConstraintError);
     });
 
     it("should enforce unique url constraint", async () => {
-      const project = await createTestProject();
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
       const url = `https://example.com/webhook/${uniqueId()}`;
 
-      await createTestEndpoint(project.id, { url });
+      await createTestEndpoint(prisma, project.id, { url });
 
-      await expect(createTestEndpoint(project.id, { url })).rejects.toSatisfy(
-        isUniqueConstraintError
-      );
+      await expect(
+        createTestEndpoint(prisma, project.id, { url })
+      ).rejects.toSatisfy(isUniqueConstraintError);
     });
   });
 
   describe("Event", () => {
     it("should create an event linked to project and endpoint", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
-      const event = await createTestEvent(project.id, endpoint.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
 
       expect(event.id).toBeDefined();
       expect(event.projectId).toBe(project.id);
@@ -81,37 +76,40 @@ describe("Schema Constraints", () => {
     });
 
     it("should reject event creation with invalid projectId", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       await expect(
-        createTestEvent("non_existent_project_id", endpoint.id)
+        createTestEvent(prisma, "non_existent_project_id", endpoint.id)
       ).rejects.toSatisfy(isForeignKeyConstraintError);
     });
 
     it("should reject event creation with invalid endpointId", async () => {
-      const project = await createTestProject();
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
 
       await expect(
-        createTestEvent(project.id, "non_existent_endpoint_id")
+        createTestEvent(prisma, project.id, "non_existent_endpoint_id")
       ).rejects.toSatisfy(isForeignKeyConstraintError);
     });
   });
 
   describe("Idempotency Key Constraint", () => {
     it("should allow duplicate idempotencyKey across different projects", async () => {
-      const project1 = await createTestProject();
-      const project2 = await createTestProject();
-      const endpoint1 = await createTestEndpoint(project1.id);
-      const endpoint2 = await createTestEndpoint(project2.id);
+      const prisma = getTestPrisma();
+      const project1 = await createTestProject(prisma);
+      const project2 = await createTestProject(prisma);
+      const endpoint1 = await createTestEndpoint(prisma, project1.id);
+      const endpoint2 = await createTestEndpoint(prisma, project2.id);
 
       const idempotencyKey = `idem_${uniqueId()}`;
 
       // Same idempotency key in different projects should succeed
-      const event1 = await createTestEvent(project1.id, endpoint1.id, {
+      const event1 = await createTestEvent(prisma, project1.id, endpoint1.id, {
         idempotencyKey,
       });
-      const event2 = await createTestEvent(project2.id, endpoint2.id, {
+      const event2 = await createTestEvent(prisma, project2.id, endpoint2.id, {
         idempotencyKey,
       });
 
@@ -121,27 +119,31 @@ describe("Schema Constraints", () => {
     });
 
     it("should reject duplicate idempotencyKey within same project", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const idempotencyKey = `idem_${uniqueId()}`;
 
-      await createTestEvent(project.id, endpoint.id, { idempotencyKey });
+      await createTestEvent(prisma, project.id, endpoint.id, {
+        idempotencyKey,
+      });
 
       await expect(
-        createTestEvent(project.id, endpoint.id, { idempotencyKey })
+        createTestEvent(prisma, project.id, endpoint.id, { idempotencyKey })
       ).rejects.toSatisfy(isUniqueConstraintError);
     });
 
     it("should allow null idempotencyKey for multiple events", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       // Multiple events without idempotency key should succeed
-      const event1 = await createTestEvent(project.id, endpoint.id, {
+      const event1 = await createTestEvent(prisma, project.id, endpoint.id, {
         idempotencyKey: null,
       });
-      const event2 = await createTestEvent(project.id, endpoint.id, {
+      const event2 = await createTestEvent(prisma, project.id, endpoint.id, {
         idempotencyKey: null,
       });
 
@@ -153,8 +155,9 @@ describe("Schema Constraints", () => {
 
   describe("Cascade Delete", () => {
     it("should cascade delete endpoints when project is deleted", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       await prisma.project.delete({ where: { id: project.id } });
 
@@ -166,9 +169,10 @@ describe("Schema Constraints", () => {
     });
 
     it("should cascade delete events when project is deleted", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
-      const event = await createTestEvent(project.id, endpoint.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
 
       await prisma.project.delete({ where: { id: project.id } });
 
@@ -180,9 +184,10 @@ describe("Schema Constraints", () => {
     });
 
     it("should cascade delete events when endpoint is deleted", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
-      const event = await createTestEvent(project.id, endpoint.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
 
       await prisma.webhookEndpoint.delete({ where: { id: endpoint.id } });
 
@@ -196,8 +201,9 @@ describe("Schema Constraints", () => {
 
   describe("Raw Payload Storage", () => {
     it("should store and retrieve complex headers JSON", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const complexHeaders = {
         "content-type": "application/json",
@@ -206,7 +212,7 @@ describe("Schema Constraints", () => {
         "x-nested": { key: "value", nested: { deep: true } },
       };
 
-      const event = await createTestEvent(project.id, endpoint.id, {
+      const event = await createTestEvent(prisma, project.id, endpoint.id, {
         headers: complexHeaders,
       });
 
@@ -218,8 +224,9 @@ describe("Schema Constraints", () => {
     });
 
     it("should store and retrieve complex body JSON", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const complexBody = {
         action: "webhook.received",
@@ -233,7 +240,7 @@ describe("Schema Constraints", () => {
         timestamp: "2024-01-01T00:00:00Z",
       };
 
-      const event = await createTestEvent(project.id, endpoint.id, {
+      const event = await createTestEvent(prisma, project.id, endpoint.id, {
         body: complexBody,
       });
 
@@ -245,10 +252,11 @@ describe("Schema Constraints", () => {
     });
 
     it("should allow null body (webhooks may have empty body)", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
-      const event = await createTestEvent(project.id, endpoint.id, {
+      const event = await createTestEvent(prisma, project.id, endpoint.id, {
         body: null,
       });
 
@@ -260,8 +268,9 @@ describe("Schema Constraints", () => {
     });
 
     it("should preserve exact JSON structure without modification", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       // Test edge cases: empty objects, empty arrays, special characters
       const edgeCaseBody = {
@@ -274,7 +283,7 @@ describe("Schema Constraints", () => {
         nullValue: null,
       };
 
-      const event = await createTestEvent(project.id, endpoint.id, {
+      const event = await createTestEvent(prisma, project.id, endpoint.id, {
         body: edgeCaseBody,
       });
 
@@ -288,6 +297,7 @@ describe("Schema Constraints", () => {
 
   describe("Required Field Constraints", () => {
     it("should require name for Project", async () => {
+      const prisma = getTestPrisma();
       // Use type assertion to bypass TypeScript and test database constraint
       const invalidData = { projectKey: uniqueId("pk") } as Parameters<
         typeof prisma.project.create
@@ -299,6 +309,7 @@ describe("Schema Constraints", () => {
     });
 
     it("should require projectKey for Project", async () => {
+      const prisma = getTestPrisma();
       const invalidData = { name: "Test Project" } as Parameters<
         typeof prisma.project.create
       >[0]["data"];
@@ -309,7 +320,8 @@ describe("Schema Constraints", () => {
     });
 
     it("should require url for WebhookEndpoint", async () => {
-      const project = await createTestProject();
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
 
       const invalidData = {
         name: "Test Endpoint",
@@ -322,7 +334,8 @@ describe("Schema Constraints", () => {
     });
 
     it("should require name for WebhookEndpoint", async () => {
-      const project = await createTestProject();
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
 
       const invalidData = {
         url: `https://example.com/${uniqueId()}`,
@@ -335,8 +348,9 @@ describe("Schema Constraints", () => {
     });
 
     it("should require method for Event", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const invalidData = {
         projectId: project.id,
@@ -350,8 +364,9 @@ describe("Schema Constraints", () => {
     });
 
     it("should require headers for Event", async () => {
-      const project = await createTestProject();
-      const endpoint = await createTestEndpoint(project.id);
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
 
       const invalidData = {
         projectId: project.id,

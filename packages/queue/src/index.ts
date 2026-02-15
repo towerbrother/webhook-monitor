@@ -1,19 +1,8 @@
-import { Queue } from "bullmq";
-import type { RedisOptions } from "ioredis";
-
-/**
- * Redis connection configuration for BullMQ
- * Override via environment variables
- */
-export const redisConfig: RedisOptions = {
-  host: process.env.REDIS_HOST ?? "localhost",
-  port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-  maxRetriesPerRequest: null,
-};
+import { Queue, Worker, Job, QueueEvents } from "bullmq";
+import type { RedisOptions, QueueOptions, JobsOptions } from "bullmq";
 
 /**
  * Queue names - centralized definition
- * Will be expanded as we add more job types
  */
 export const QUEUE_NAMES = {
   WEBHOOK_DELIVERY: "webhook-delivery",
@@ -36,66 +25,68 @@ export interface WebhookDeliveryJobData {
 }
 
 /**
- * Singleton queue instance for webhook delivery
- * Lazy-initialized on first access
+ * Default job options for webhook delivery queue
  */
-let webhookDeliveryQueue: Queue<WebhookDeliveryJobData> | null = null;
+export const DEFAULT_JOB_OPTIONS: JobsOptions = {
+  attempts: 5,
+  backoff: {
+    type: "exponential",
+    delay: 1000,
+  },
+  removeOnComplete: {
+    count: 1000,
+    age: 24 * 60 * 60, // 24 hours
+  },
+  removeOnFail: {
+    count: 5000,
+  },
+};
 
 /**
- * Get the webhook delivery queue instance
- * Creates it if it doesn't exist
+ * Configuration for creating a webhook delivery queue
  */
-export function getWebhookDeliveryQueue(): Queue<WebhookDeliveryJobData> {
-  if (!webhookDeliveryQueue) {
-    webhookDeliveryQueue = new Queue<WebhookDeliveryJobData>(
-      QUEUE_NAMES.WEBHOOK_DELIVERY,
-      {
-        connection: redisConfig,
-        defaultJobOptions: {
-          attempts: 5,
-          backoff: {
-            type: "exponential",
-            delay: 1000,
-          },
-          removeOnComplete: {
-            count: 1000,
-            age: 24 * 60 * 60, // 24 hours
-          },
-          removeOnFail: {
-            count: 5000,
-          },
-        },
-      }
-    );
-  }
-  return webhookDeliveryQueue;
+export interface QueueConfig {
+  redis: RedisOptions;
+  jobOptions?: JobsOptions;
 }
 
 /**
- * Enqueue a webhook delivery job
- * Called after event is persisted to database
+ * Create a webhook delivery queue instance.
+ * Caller is responsible for calling queue.close() on shutdown.
+ *
+ * @example
+ * ```typescript
+ * const queue = createWebhookDeliveryQueue({
+ *   redis: { host: "localhost", port: 6379 }
+ * });
+ * await queue.add("job-name", data);
+ * // on shutdown:
+ * await queue.close();
+ * ```
+ */
+export function createWebhookDeliveryQueue(
+  config: QueueConfig
+): Queue<WebhookDeliveryJobData> {
+  return new Queue<WebhookDeliveryJobData>(QUEUE_NAMES.WEBHOOK_DELIVERY, {
+    connection: config.redis,
+    defaultJobOptions: config.jobOptions ?? DEFAULT_JOB_OPTIONS,
+  });
+}
+
+/**
+ * Enqueue a webhook delivery job.
+ * Uses eventId as jobId for idempotency.
  */
 export async function enqueueWebhookDelivery(
+  queue: Queue<WebhookDeliveryJobData>,
   data: WebhookDeliveryJobData
 ): Promise<string> {
-  const queue = getWebhookDeliveryQueue();
   const job = await queue.add(`deliver-${data.eventId}`, data, {
-    jobId: data.eventId, // Use eventId as jobId for idempotency
+    jobId: data.eventId,
   });
   return job.id!;
 }
 
-/**
- * Close the queue connection
- * Should be called during graceful shutdown
- */
-export async function closeQueue(): Promise<void> {
-  if (webhookDeliveryQueue) {
-    await webhookDeliveryQueue.close();
-    webhookDeliveryQueue = null;
-  }
-}
-
-// Re-export BullMQ types for convenience when needed later
-export { Queue, Worker, Job, QueueEvents } from "bullmq";
-export type { QueueOptions, JobsOptions } from "bullmq";
+// Re-export BullMQ types for convenience
+export { Queue, Worker, Job, QueueEvents };
+export type { QueueOptions, JobsOptions, RedisOptions };

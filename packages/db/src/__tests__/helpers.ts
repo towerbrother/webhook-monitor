@@ -5,8 +5,13 @@
  * These helpers ensure consistent test data across all test files.
  */
 
-import { prisma, Prisma } from "../index.js";
-import type { Project, WebhookEndpoint, Event } from "@prisma/client";
+import type {
+  PrismaClient,
+  Project,
+  WebhookEndpoint,
+  Event,
+} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 /**
  * Generate a unique ID for test data
@@ -27,6 +32,7 @@ export function uniqueProjectKey(): string {
  * Create a test project with sensible defaults
  */
 export async function createTestProject(
+  prisma: PrismaClient,
   overrides: Partial<Omit<Project, "id" | "createdAt">> = {}
 ): Promise<Project> {
   return prisma.project.create({
@@ -41,6 +47,7 @@ export async function createTestProject(
  * Create a test webhook endpoint with sensible defaults
  */
 export async function createTestEndpoint(
+  prisma: PrismaClient,
   projectId: string,
   overrides: Partial<
     Omit<WebhookEndpoint, "id" | "createdAt" | "projectId">
@@ -59,6 +66,7 @@ export async function createTestEndpoint(
  * Create a test event with sensible defaults
  */
 export async function createTestEvent(
+  prisma: PrismaClient,
   projectId: string,
   endpointId: string,
   overrides: Partial<
@@ -90,14 +98,14 @@ export async function createTestEvent(
  * Create a complete test scenario with project, endpoint, and event
  * Useful for tests that need a full data hierarchy
  */
-export async function createTestScenario(): Promise<{
+export async function createTestScenario(prisma: PrismaClient): Promise<{
   project: Project;
   endpoint: WebhookEndpoint;
   event: Event;
 }> {
-  const project = await createTestProject();
-  const endpoint = await createTestEndpoint(project.id);
-  const event = await createTestEvent(project.id, endpoint.id);
+  const project = await createTestProject(prisma);
+  const endpoint = await createTestEndpoint(prisma, project.id);
+  const event = await createTestEvent(prisma, project.id, endpoint.id);
 
   return { project, endpoint, event };
 }

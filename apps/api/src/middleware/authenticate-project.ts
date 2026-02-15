@@ -1,5 +1,4 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { prisma } from "@repo/db";
 
 /**
  * Middleware to authenticate webhook requests using project key.
@@ -23,7 +22,7 @@ export async function authenticateProject(
     });
   }
 
-  const project = await prisma.project.findUnique({
+  const project = await request.server.prisma.project.findUnique({
     where: { projectKey },
   });
 

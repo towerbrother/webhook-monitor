@@ -1,7 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { Prisma } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
-import { prisma } from "@repo/db";
 import { enqueueWebhookDelivery } from "@repo/queue";
 
 /**
@@ -24,7 +23,7 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
     const { project } = request; // Attached by authenticateProject middleware
 
     // Verify endpoint belongs to the authenticated project
-    const endpoint = await prisma.webhookEndpoint.findFirst({
+    const endpoint = await fastify.prisma.webhookEndpoint.findFirst({
       where: {
         id: endpointId,
         projectId: project.id,
@@ -40,7 +39,7 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     // Create event record
-    const event = await prisma.event.create({
+    const event = await fastify.prisma.event.create({
       data: {
         endpointId: endpoint.id,
         projectId: project.id,
@@ -52,7 +51,7 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
 
     // Enqueue delivery job (fire-and-forget, don't block response)
     // In production, consider handling enqueue failures
-    enqueueWebhookDelivery({
+    enqueueWebhookDelivery(fastify.queue, {
       eventId: event.id,
       projectId: project.id,
       endpointId: endpoint.id,
