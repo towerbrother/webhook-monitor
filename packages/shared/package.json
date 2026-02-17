@@ -14,9 +14,9 @@
     "lint": "eslint ."
   },
   "devDependencies": {
-    "@types/node": "^22.19.7",
+    "@types/node": "^22.19.11",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "typescript": "5.9.2"
+    "typescript": "5.9.3"
   }
 }

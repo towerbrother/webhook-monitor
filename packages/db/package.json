@@ -28,11 +28,11 @@
     "@prisma/client": "^6.6.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.7",
+    "@types/node": "^22.19.11",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "prisma": "^6.6.0",
-    "typescript": "5.9.2",
+    "typescript": "5.9.3",
     "vitest": "^4.0.18"
   }
 }
