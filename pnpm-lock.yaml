@@ -135,7 +135,7 @@ importers:
   packages/db:
     dependencies:
       '@prisma/client':
-        specifier: ^6.6.0
+        specifier: ^6.19.2
         version: 6.19.2(prisma@6.19.2(typescript@5.9.2))(typescript@5.9.2)
     devDependencies:
       '@repo/eslint-config':
@@ -148,7 +148,7 @@ importers:
         specifier: ^22.19.7
         version: 22.19.7
       prisma:
-        specifier: ^6.6.0
+        specifier: ^6.19.2
         version: 6.19.2(typescript@5.9.2)
       typescript:
         specifier: 5.9.2
