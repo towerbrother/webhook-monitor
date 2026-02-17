@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@repo/shared": "workspace:*",
-    "ioredis": "^5.6.0",
+    "ioredis": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
