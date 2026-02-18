@@ -4,7 +4,7 @@
  *
  * This script:
  * 1. Checks if PostgreSQL is running
- * 2. Creates the test database if it doesn't exist
+ * 2. Drops and recreates the test database to ensure a clean state
  * 3. Runs migrations on the test database
  *
  * Usage: node scripts/setup-test-db.js
@@ -42,13 +42,25 @@ async function setupTestDatabase() {
       [TEST_DB_NAME]
     );
 
-    if (result.rows.length === 0) {
-      console.log(`📦 Creating test database: ${TEST_DB_NAME}...`);
-      await client.query(`CREATE DATABASE ${TEST_DB_NAME}`);
-      console.log(`✅ Test database created: ${TEST_DB_NAME}`);
-    } else {
-      console.log(`✅ Test database already exists: ${TEST_DB_NAME}`);
+    if (result.rows.length > 0) {
+      console.log(`🗑️  Dropping existing test database: ${TEST_DB_NAME}...`);
+      // Terminate all connections to the database before dropping
+      await client.query(
+        `
+        SELECT pg_terminate_backend(pg_stat_activity.pid)
+        FROM pg_stat_activity
+        WHERE pg_stat_activity.datname = $1
+          AND pid <> pg_backend_pid()
+      `,
+        [TEST_DB_NAME]
+      );
+      await client.query(`DROP DATABASE ${TEST_DB_NAME}`);
+      console.log(`✅ Existing test database dropped`);
     }
+
+    console.log(`📦 Creating test database: ${TEST_DB_NAME}...`);
+    await client.query(`CREATE DATABASE ${TEST_DB_NAME}`);
+    console.log(`✅ Test database created: ${TEST_DB_NAME}`);
 
     await client.end();
 
