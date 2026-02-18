@@ -6,7 +6,7 @@ import { nextJsConfig } from "@repo/eslint-config/next-js";
  */
 export default [
   {
-    ignores: ["eslint.config.js", ".next/**"],
+    ignores: ["eslint.config.js", "next.config.ts", ".next/**"],
   },
   ...nextJsConfig,
   {

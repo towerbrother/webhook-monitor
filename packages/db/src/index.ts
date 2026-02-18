@@ -1,4 +1,6 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 
 /**
  * Prisma client configuration options
@@ -12,6 +14,10 @@ export interface PrismaClientConfig {
    * Log levels to enable
    */
   log?: Prisma.LogLevel[];
+  /**
+   * Database connection string (optional, defaults to DATABASE_URL env var)
+   */
+  connectionString?: string;
 }
 
 /**
@@ -32,7 +38,15 @@ export function createPrismaClient(
   const logLevels: Prisma.LogLevel[] =
     config.log ?? (config.logQueries ? ["query", "error", "warn"] : ["error"]);
 
+  const connectionString =
+    config.connectionString ?? process.env.DATABASE_URL ?? "";
+
+  // Prisma 7.x requires an adapter when using the client engine
+  const pool = new pg.Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+
   return new PrismaClient({
+    adapter,
     log: logLevels,
   });
 }

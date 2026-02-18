@@ -1,4 +1,9 @@
 import { defineProject } from "vitest/config";
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load .env file from this package
+config({ path: resolve(__dirname, ".env") });
 
 export default defineProject({
   test: {

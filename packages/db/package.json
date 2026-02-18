@@ -19,20 +19,25 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "db:setup": "node scripts/setup-test-db.js",
+    "pretest": "node scripts/setup-test-db.js",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@prisma/client": "^6.6.0"
+    "@prisma/adapter-pg": "^7.4.0",
+    "@prisma/client": "^7.4.0",
+    "pg": "^8.18.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.7",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "prisma": "^6.6.0",
-    "typescript": "5.9.2",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.16.0",
+    "prisma": "^7.4.0",
+    "typescript": "5.9.3",
     "vitest": "^4.0.18"
   }
 }
