@@ -8,7 +8,7 @@
 
 import { beforeAll, afterAll, beforeEach } from "vitest";
 import { createPrismaClient } from "../index.js";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../generated/client.js";
 
 // Test database client instance
 let prisma: PrismaClient | undefined;

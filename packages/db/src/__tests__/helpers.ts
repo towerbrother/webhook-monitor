@@ -11,7 +11,7 @@ import {
   type Project,
   type WebhookEndpoint,
   type Event,
-} from "@prisma/client";
+} from "../generated/client.js";
 
 /**
  * Generate a unique ID for test data

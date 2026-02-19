@@ -1,4 +1,4 @@
-import { PrismaClient, type Prisma } from "@prisma/client";
+import { PrismaClient, type Prisma } from "./generated/client.js";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
@@ -52,5 +52,5 @@ export function createPrismaClient(
 }
 
 // Re-export Prisma types for convenience
-export * from "@prisma/client";
+export * from "./generated/client.js";
 export * from "./domain.js";
