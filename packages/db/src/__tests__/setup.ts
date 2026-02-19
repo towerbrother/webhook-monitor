@@ -54,7 +54,8 @@ beforeAll(async () => {
     return;
   }
 
-  prisma = createPrismaClient({ logQueries: false });
+  prisma = createPrismaClient({ silent: true });
+
   try {
     await prisma.$connect();
   } catch (error) {

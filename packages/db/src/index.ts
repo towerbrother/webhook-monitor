@@ -18,6 +18,11 @@ export interface PrismaClientConfig {
    * Database connection string (optional, defaults to DATABASE_URL env var)
    */
   connectionString?: string;
+  /**
+   * Disable error logging (useful for tests with expected errors)
+   * Defaults to false (errors are logged)
+   */
+  silent?: boolean;
 }
 
 /**
@@ -36,7 +41,12 @@ export function createPrismaClient(
   config: PrismaClientConfig = {}
 ): PrismaClient {
   const logLevels: Prisma.LogLevel[] =
-    config.log ?? (config.logQueries ? ["query", "error", "warn"] : ["error"]);
+    config.log ??
+    (config.silent
+      ? []
+      : config.logQueries
+        ? ["query", "error", "warn"]
+        : ["error"]);
 
   const connectionString =
     config.connectionString ?? process.env.DATABASE_URL ?? "";
@@ -51,6 +61,7 @@ export function createPrismaClient(
   });
 }
 
-// Re-export Prisma types for convenience
-export * from "./generated/client.js";
+// Re-export Prisma types for convenience (except conflicting model types)
+export { Prisma, PrismaClient } from "./generated/client.js";
+// Export domain types which include the models
 export * from "./domain.js";
