@@ -9,7 +9,10 @@ import {
   uniqueId,
 } from "./helpers.js";
 
-describe("Schema Constraints", () => {
+// Skip tests if DATABASE_URL is not set
+const skipTests = !process.env.DATABASE_URL;
+
+describe.skipIf(skipTests)("Schema Constraints", () => {
   describe("Project", () => {
     it("should create a project successfully", async () => {
       const prisma = getTestPrisma();

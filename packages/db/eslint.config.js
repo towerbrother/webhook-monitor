@@ -12,6 +12,8 @@ export default [
       "prisma/migrations/**",
       "eslint.config.js",
       "vitest.config.ts",
+      "prisma.config.ts",
+      "scripts/**",
     ],
   },
   ...baseConfig,

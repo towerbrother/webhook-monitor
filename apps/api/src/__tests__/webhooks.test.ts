@@ -51,7 +51,10 @@ afterAll(async () => {
   await app.close();
 });
 
-describe("Webhook Ingestion API", () => {
+// Skip tests if DATABASE_URL is not set
+const skipTests = !process.env.DATABASE_URL;
+
+describe.skipIf(skipTests)("Webhook Ingestion API", () => {
   describe("Authentication", () => {
     it("should reject requests without X-Project-Key header", async () => {
       const response = await app.inject({
@@ -290,7 +293,7 @@ describe("Webhook Ingestion API", () => {
   });
 });
 
-describe("Health Check", () => {
+describe.skipIf(skipTests)("Health Check", () => {
   it("should return ok status", async () => {
     const response = await app.inject({
       method: "GET",

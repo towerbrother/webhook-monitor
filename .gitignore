@@ -39,3 +39,6 @@ yarn-error.log*
 
 # OpenCode
 .opencode
+
+# Next.js
+next-env.d.ts

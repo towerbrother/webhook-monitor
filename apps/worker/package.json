@@ -12,14 +12,14 @@
   },
   "dependencies": {
     "@repo/shared": "workspace:*",
-    "ioredis": "^5.6.0",
+    "ioredis": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^22.19.7",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "tsx": "^4.19.3",
-    "typescript": "5.9.2"
+    "@types/node": "^24.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
   }
 }

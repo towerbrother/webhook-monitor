@@ -6,15 +6,15 @@
  */
 
 import { beforeAll, afterAll, beforeEach } from "vitest";
-import { createPrismaClient } from "@repo/db";
-import type { PrismaClient } from "@repo/db";
+import { createPrismaClient, type PrismaClient } from "@repo/db";
 
-let prisma: PrismaClient;
+let prisma: PrismaClient | undefined;
 
 export function getTestPrisma(): PrismaClient {
   if (!prisma) {
     throw new Error("Test prisma client not initialized");
   }
+
   return prisma;
 }
 
@@ -22,6 +22,16 @@ export function getTestPrisma(): PrismaClient {
  * Connect to database before all tests
  */
 beforeAll(async () => {
+  // Skip tests if DATABASE_URL is not set
+  if (!process.env.DATABASE_URL) {
+    console.warn(
+      "⚠️  DATABASE_URL not set. Skipping API tests.\n" +
+        "   To run tests, set DATABASE_URL in your environment or .env file.\n" +
+        "   Example: postgresql://postgres:postgres@localhost:5432/webhook_monitor_test"
+    );
+    return;
+  }
+
   prisma = createPrismaClient({ logQueries: false });
   await prisma.$connect();
 });
@@ -30,15 +40,21 @@ beforeAll(async () => {
  * Clean up test data before each test for isolation
  */
 beforeEach(async () => {
+  if (!prisma) {
+    return;
+  }
+
   // Delete in dependency order (most dependent first)
-  await prisma.event.deleteMany();
-  await prisma.webhookEndpoint.deleteMany();
-  await prisma.project.deleteMany();
+  await prisma.event.deleteMany({});
+  await prisma.webhookEndpoint.deleteMany({});
+  await prisma.project.deleteMany({});
 });
 
 /**
  * Disconnect from database after all tests
  */
 afterAll(async () => {
-  await prisma.$disconnect();
+  if (prisma) {
+    await prisma.$disconnect();
+  }
 });

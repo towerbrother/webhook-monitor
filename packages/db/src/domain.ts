@@ -7,7 +7,7 @@
  * - Event: Immutable webhook request record (owned by WebhookEndpoint and Project)
  */
 
-import type { Project, WebhookEndpoint, Event } from "@prisma/client";
+import type { Project, WebhookEndpoint, Event } from "./generated/client.js";
 
 export type { Project, WebhookEndpoint, Event };
 

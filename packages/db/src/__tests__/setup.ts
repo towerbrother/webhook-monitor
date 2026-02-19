@@ -8,10 +8,10 @@
 
 import { beforeAll, afterAll, beforeEach } from "vitest";
 import { createPrismaClient } from "../index.js";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "../generated/client.js";
 
 // Test database client instance
-let prisma: PrismaClient;
+let prisma: PrismaClient | undefined;
 
 /**
  * Get the test database client
@@ -31,16 +31,31 @@ export function getTestPrisma(): PrismaClient {
  * Deletes in correct order to respect foreign key constraints
  */
 async function cleanDatabase(): Promise<void> {
-  await prisma.event.deleteMany();
-  await prisma.webhookEndpoint.deleteMany();
-  await prisma.project.deleteMany();
+  if (!prisma) {
+    return;
+  }
+
+  await prisma.event.deleteMany({});
+  await prisma.webhookEndpoint.deleteMany({});
+  await prisma.project.deleteMany({});
 }
 
 /**
  * Verify database connection before running any tests
  */
 beforeAll(async () => {
-  prisma = createPrismaClient({ logQueries: false });
+  // Skip tests if DATABASE_URL is not set
+  if (!process.env.DATABASE_URL) {
+    console.warn(
+      "⚠️  DATABASE_URL not set. Skipping database tests.\n" +
+        "   To run tests, set DATABASE_URL in your environment or .env file.\n" +
+        "   Example: postgresql://postgres:postgres@localhost:5432/webhook_monitor_test"
+    );
+    return;
+  }
+
+  prisma = createPrismaClient({ silent: true });
+
   try {
     await prisma.$connect();
   } catch (error) {
@@ -57,13 +72,17 @@ beforeAll(async () => {
  * Clean up database before each test to ensure isolation
  */
 beforeEach(async () => {
-  await cleanDatabase();
+  if (prisma) {
+    await cleanDatabase();
+  }
 });
 
 /**
  * Disconnect from database after all tests complete
  */
 afterAll(async () => {
-  await cleanDatabase();
-  await prisma.$disconnect();
+  if (prisma) {
+    await cleanDatabase();
+    await prisma.$disconnect();
+  }
 });

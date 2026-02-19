@@ -4,28 +4,9 @@ A Turborepo monorepo for webhook monitoring with automated dependency management
 
 ## Prerequisites
 
-- Node.js >= 22
+- Node.js >= 24.13.1
 - pnpm 10.28.2 (exact version, enforced)
-- PostgreSQL (local or remote)
-- Redis (local or remote)
-
-## Structure
-
-```
-apps/
-├── api/       # Fastify backend API
-├── worker/    # BullMQ background job processor
-└── web/       # Next.js frontend application
-
-packages/
-├── db/                # Prisma database client
-├── queue/             # BullMQ job queue
-├── shared/            # Shared utilities and types
-├── eslint-config/     # ESLint configurations
-└── typescript-config/ # TypeScript configurations
-
-docs/          # Project documentation
-```
+- Docker (for PostgreSQL and Redis)
 
 ## Quick Start
 
@@ -33,11 +14,11 @@ docs/          # Project documentation
 # Install dependencies
 pnpm install
 
-# Set up environment variables
-cp .env.example .env  # (when created)
+# Start infrastructure (PostgreSQL + Redis)
+docker compose up -d
 
-# Run database migrations
-pnpm --filter @repo/db prisma migrate dev
+# Setup databases (creates test DB and runs migrations)
+pnpm db:setup
 
 # Start all development servers
 pnpm dev
@@ -51,6 +32,8 @@ pnpm build        # Build all packages
 pnpm lint         # Lint all packages
 pnpm format       # Format code with Prettier
 pnpm check-types  # Run TypeScript checks
+pnpm db:setup     # Setup databases (start Docker + create test DB)
+pnpm test         # Run all tests
 ```
 
 ## Documentation

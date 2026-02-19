@@ -210,5 +210,5 @@ When tests are added:
 
 ## Node.js Version
 
-- **Node.js >= 22** required (specified in package.json engines)
+- **Node.js >= 24.13.1** required (specified in package.json engines)
 - **Use latest LTS** recommended for development

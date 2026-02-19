@@ -5,13 +5,13 @@
  * These helpers ensure consistent test data across all test files.
  */
 
-import type {
-  PrismaClient,
-  Project,
-  WebhookEndpoint,
-  Event,
-} from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import {
+  Prisma,
+  type PrismaClient,
+  type Project,
+  type WebhookEndpoint,
+  type Event,
+} from "../generated/client.js";
 
 /**
  * Generate a unique ID for test data

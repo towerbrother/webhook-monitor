@@ -16,6 +16,7 @@ out
 
 # Generated files
 .prisma
+packages/db/src/generated
 
 # OS files
 .DS_Store
