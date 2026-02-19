@@ -1,10 +1,17 @@
-import { Redis } from "ioredis";
+import { Worker, QUEUE_NAMES, type WebhookDeliveryJobData } from "@repo/queue";
 import { APP_NAME } from "@repo/shared";
 import { validateEnv } from "./env.js";
+import { processWebhookDelivery } from "./processor.js";
 
 const env = validateEnv();
-const REDIS_HOST = env.REDIS_HOST;
-const REDIS_PORT = env.REDIS_PORT;
+
+// Simple console logger (Step 7 will add Pino)
+const logger = {
+  info: (obj: Record<string, unknown>, msg: string) =>
+    console.log(JSON.stringify({ level: "info", msg, ...obj })),
+  error: (obj: Record<string, unknown>, msg: string) =>
+    console.error(JSON.stringify({ level: "error", msg, ...obj })),
+};
 
 async function main() {
   console.log(`
@@ -13,18 +20,54 @@ async function main() {
 ╚════════════════════════════════════════════╝
   `);
 
-  // Create Redis connection to verify connectivity
-  const redis = new Redis({
-    host: REDIS_HOST,
-    port: REDIS_PORT,
-    maxRetriesPerRequest: null,
-    lazyConnect: true,
+  // Create BullMQ worker
+  const worker = new Worker<WebhookDeliveryJobData>(
+    QUEUE_NAMES.WEBHOOK_DELIVERY,
+    async (job) => {
+      await processWebhookDelivery(job, { logger });
+    },
+    {
+      connection: {
+        host: env.REDIS_HOST,
+        port: env.REDIS_PORT,
+        maxRetriesPerRequest: null,
+      },
+      concurrency: 10, // Process up to 10 jobs in parallel
+    }
+  );
+
+  // Worker event handlers
+  worker.on("ready", () => {
+    logger.info({}, "Worker is ready and listening for jobs");
+  });
+
+  worker.on("completed", (job) => {
+    logger.info(
+      { jobId: job.id, eventId: job.data.eventId },
+      "Job completed successfully"
+    );
+  });
+
+  worker.on("failed", (job, err) => {
+    logger.error(
+      {
+        jobId: job?.id,
+        eventId: job?.data.eventId,
+        error: err.message,
+        attempt: job?.attemptsMade,
+      },
+      "Job failed"
+    );
+  });
+
+  worker.on("error", (err) => {
+    logger.error({ error: err.message }, "Worker error");
   });
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     console.log(`\n📴 Received ${signal}, shutting down gracefully...`);
-    await redis.quit();
+    await worker.close();
     console.log("👋 Worker stopped");
     process.exit(0);
   };
@@ -32,30 +75,17 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 
-  try {
-    await redis.connect();
-    console.log(`✅ Connected to Redis at ${REDIS_HOST}:${REDIS_PORT}`);
-
-    // Ping to verify connection
-    const pong = await redis.ping();
-    console.log(`🏓 Redis ping: ${pong}`);
-
-    console.log(`
+  console.log(`
 ╔════════════════════════════════════════════╗
 ║  ✅ ${APP_NAME.toUpperCase()} WORKER READY            ║
-║  📡 Redis: ${REDIS_HOST}:${REDIS_PORT}                    ║
-║  ⏳ Waiting for jobs...                    ║
+║  📡 Redis: ${env.REDIS_HOST}:${env.REDIS_PORT}                    ║
+║  📋 Queue: ${QUEUE_NAMES.WEBHOOK_DELIVERY}           ║
+║  ⏳ Processing jobs...                     ║
 ╚════════════════════════════════════════════╝
-    `);
-
-    // Keep the process alive
-    // In production, workers would be processing jobs here
-    // For now, we just wait
-    await new Promise(() => {});
-  } catch (err) {
-    console.error("❌ Failed to connect to Redis:", err);
-    process.exit(1);
-  }
+  `);
 }
 
-main();
+main().catch((err) => {
+  console.error("❌ Worker failed to start:", err);
+  process.exit(1);
+});
