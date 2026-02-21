@@ -43,7 +43,7 @@ Comprehensive documentation is available in the [`docs/`](./docs) directory:
 - **[docs/README.md](./docs/README.md)** - Documentation index
 - **[docs/automation.md](./docs/automation.md)** - Renovate, CI/CD, branch protection
 - **[docs/infrastructure.md](./docs/infrastructure.md)** - Deployment, database, monitoring
-- **[docs/workflows.md](./docs/workflows.md)** - Git strategy, PR process, development
+- **[docs/development.md](./docs/development.md)** - Git strategy, PR process, development
 
 ### Quick Links
 
@@ -51,8 +51,8 @@ Comprehensive documentation is available in the [`docs/`](./docs) directory:
 | -------------------- | ------------------------------------------------------------------------- |
 | Setting up Renovate  | [docs/automation.md](./docs/automation.md#dependency-management-renovate) |
 | Deployment strategy  | [docs/infrastructure.md](./docs/infrastructure.md#deployment-strategy)    |
-| Pull request process | [docs/workflows.md](./docs/workflows.md#pull-request-process)             |
-| Troubleshooting      | [docs/workflows.md](./docs/workflows.md#troubleshooting)                  |
+| Pull request process | [docs/development.md](./docs/development.md#pull-request-process)         |
+| Troubleshooting      | [docs/development.md](./docs/development.md#troubleshooting)              |
 
 ## Architecture
 

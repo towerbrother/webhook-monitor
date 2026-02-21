@@ -288,12 +288,12 @@ postgresql://postgres:postgres@localhost:5432/webhook_monitor
 
 **Setup steps:**
 
-1. Install PostgreSQL and Redis locally
+1. Start PostgreSQL and Redis: `docker compose up -d`
 2. Copy `.env.example` to `.env` (if exists)
-3. Update connection strings
+3. Update connection strings (default values work with docker-compose.yml)
 4. Run migrations: `pnpm --filter @repo/db prisma migrate dev`
 
-**Note:** No Docker configuration in repo (per `AGENTS.md`)
+**Docker Compose:** The repo includes `docker-compose.yml` for local PostgreSQL and Redis instances.
 
 ### Managing Secrets
 
@@ -616,5 +616,5 @@ pnpm --filter @repo/db prisma migrate deploy
 ## Related Documents
 
 - [Automation](./automation.md) - CI/CD and Renovate
-- [Workflows](./workflows.md) - Development workflows
+- [Development](./development.md) - Development workflows
 - [`AGENTS.md`](../AGENTS.md) - Architecture rules

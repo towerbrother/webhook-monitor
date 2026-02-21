@@ -257,7 +257,7 @@ strategy:
     node-version: [22.x]
 ```
 
-**Rationale:** Single Node.js version per project requirements (v22+)
+**Rationale:** Single Node.js version per project requirements (v24.13.1+)
 
 **Future consideration:** Add matrix for multiple platforms (Linux, Windows) if needed
 
@@ -408,6 +408,6 @@ For Renovate auto-merge to work with branch protection:
 ## Related Documents
 
 - [Infrastructure](./infrastructure.md) - Deployment and operational concerns
-- [Workflows](./workflows.md) - Git and PR workflows
+- [Development](./development.md) - Git and PR workflows
 - [`renovate.json`](../renovate.json) - Renovate configuration
 - [`AGENTS.md`](../AGENTS.md) - Architecture and coding rules
