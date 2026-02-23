@@ -9,44 +9,44 @@
 
 ### Capability Inventory
 
-| Capability | Status | Evidence |
-|---|---|---|
-| Core domain entities | ✅ Fully implemented | `Project`, `WebhookEndpoint`, `Event` with FK constraints, cascade deletes, tenant-scoped indexes |
-| Migrations | ✅ Fully implemented | 3 migrations: init → add project key → add idempotency key column + unique constraint |
-| Ingestion API (route + auth + tenant isolation) | ✅ Fully implemented | `POST /webhooks/:endpointId`, `authenticateProject` middleware, cross-tenant 404 enforced |
-| Request body/params schema validation | ❌ Not implemented | Route body is typed as `unknown`; no Zod schema applied (required by `apps/api/AGENTS.md`) |
-| Idempotency key extraction from request | ❌ Not implemented | `Event.idempotencyKey` column exists but route never reads a key from the request |
-| Idempotency enforcement (DB constraint) | ✅ Fully implemented | `UNIQUE(projectId, idempotencyKey)` present; NULLs not deduplicated |
-| Idempotency enforcement (queue dedup) | ✅ Fully implemented | `jobId = eventId` prevents duplicate BullMQ jobs |
-| Queue integration + retry config | ✅ Fully implemented | `webhook-delivery` queue, 5 attempts, exponential backoff from 1 s, job ID dedup |
-| Worker process scaffolding | ✅ Fully implemented | Concurrency 10, graceful shutdown on `SIGTERM`/`SIGINT`, job event logging |
-| HTTP delivery logic | ❌ Not implemented | `processWebhookDelivery` is a 100 ms `setTimeout` placeholder |
-| Delivery attempt persistence / state machine | ❌ Not implemented | No `status` field on `Event`, no `DeliveryAttempt` model, no state transitions |
-| Retry enforcement at processor level | ⚠️ Partially implemented | BullMQ config correct; processor never throws, so BullMQ retries are never triggered |
-| Replay capability | ❌ Not implemented | No re-enqueue endpoint or mechanism |
-| Structured logging — API | ✅ Fully implemented | Pino via Fastify with `pino-pretty` in dev |
-| Structured logging — Worker | ⚠️ Partially implemented | Ad-hoc `console.log` + JSON; Pino planned but absent |
-| Correlation IDs / request tracing | ❌ Not implemented | No `requestId` propagation from ingestion through queue into delivery |
-| Metrics | ❌ Not implemented | No Prometheus, OpenTelemetry, or equivalent |
-| Rate limiting | ❌ Not implemented | No middleware present |
-| Signature / HMAC verification | ❌ Not implemented | No `x-hub-signature` or equivalent check |
-| CI pipeline | ✅ Fully implemented | GitHub Actions: lint, type-check, test (live PG + Redis), build on PR and `main` push |
-| Branch protection / CODEOWNERS | ✅ Fully implemented | `.github/CODEOWNERS` present |
-| Dockerfiles | ❌ Not implemented | None present |
-| Staging deployment | ❌ Not implemented | No deployment config of any kind |
-| Production deployment | ❌ Not implemented | No deployment config of any kind |
+| Capability                                      | Status                   | Evidence                                                                                          |
+| ----------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| Core domain entities                            | ✅ Fully implemented     | `Project`, `WebhookEndpoint`, `Event` with FK constraints, cascade deletes, tenant-scoped indexes |
+| Migrations                                      | ✅ Fully implemented     | 3 migrations: init → add project key → add idempotency key column + unique constraint             |
+| Ingestion API (route + auth + tenant isolation) | ✅ Fully implemented     | `POST /webhooks/:endpointId`, `authenticateProject` middleware, cross-tenant 404 enforced         |
+| Request body/params schema validation           | ❌ Not implemented       | Route body is typed as `unknown`; no Zod schema applied (required by `apps/api/AGENTS.md`)        |
+| Idempotency key extraction from request         | ❌ Not implemented       | `Event.idempotencyKey` column exists but route never reads a key from the request                 |
+| Idempotency enforcement (DB constraint)         | ✅ Fully implemented     | `UNIQUE(projectId, idempotencyKey)` present; NULLs not deduplicated                               |
+| Idempotency enforcement (queue dedup)           | ✅ Fully implemented     | `jobId = eventId` prevents duplicate BullMQ jobs                                                  |
+| Queue integration + retry config                | ✅ Fully implemented     | `webhook-delivery` queue, 5 attempts, exponential backoff from 1 s, job ID dedup                  |
+| Worker process scaffolding                      | ✅ Fully implemented     | Concurrency 10, graceful shutdown on `SIGTERM`/`SIGINT`, job event logging                        |
+| HTTP delivery logic                             | ❌ Not implemented       | `processWebhookDelivery` is a 100 ms `setTimeout` placeholder                                     |
+| Delivery attempt persistence / state machine    | ❌ Not implemented       | No `status` field on `Event`, no `DeliveryAttempt` model, no state transitions                    |
+| Retry enforcement at processor level            | ⚠️ Partially implemented | BullMQ config correct; processor never throws, so BullMQ retries are never triggered              |
+| Replay capability                               | ❌ Not implemented       | No re-enqueue endpoint or mechanism                                                               |
+| Structured logging — API                        | ✅ Fully implemented     | Pino via Fastify with `pino-pretty` in dev                                                        |
+| Structured logging — Worker                     | ⚠️ Partially implemented | Ad-hoc `console.log` + JSON; Pino planned but absent                                              |
+| Correlation IDs / request tracing               | ❌ Not implemented       | No `requestId` propagation from ingestion through queue into delivery                             |
+| Metrics                                         | ❌ Not implemented       | No Prometheus, OpenTelemetry, or equivalent                                                       |
+| Rate limiting                                   | ❌ Not implemented       | No middleware present                                                                             |
+| Signature / HMAC verification                   | ❌ Not implemented       | No `x-hub-signature` or equivalent check                                                          |
+| CI pipeline                                     | ✅ Fully implemented     | GitHub Actions: lint, type-check, test (live PG + Redis), build on PR and `main` push             |
+| Branch protection / CODEOWNERS                  | ✅ Fully implemented     | `.github/CODEOWNERS` present                                                                      |
+| Dockerfiles                                     | ❌ Not implemented       | None present                                                                                      |
+| Staging deployment                              | ❌ Not implemented       | No deployment config of any kind                                                                  |
+| Production deployment                           | ❌ Not implemented       | No deployment config of any kind                                                                  |
 
 ### Architectural Integrity Check
 
-| Concern | Verdict | Notes |
-|---|---|---|
-| Multi-tenancy enforcement | ✅ | All DB queries scoped by `projectId`; cross-tenant endpoint returns 404 (no info leakage) |
-| Idempotency at DB level | ✅ | Unique constraint in place; constraint is dead on arrival until route populates `idempotencyKey` |
-| App isolation (no cross-app imports) | ✅ | Apps import only from `packages/` |
-| Stateless service design | ✅ | No in-memory state; all state in PostgreSQL or Redis |
-| Horizontal scalability feasibility | ✅ | Stateless API, stateless worker; BullMQ supports multiple competing consumers |
-| Proper async decoupling | ✅ | Ingestion never waits for delivery; enqueue failure is soft |
-| Observability maturity | ❌ | Only basic Pino request logs; no correlation IDs, no metrics, no tracing |
+| Concern                              | Verdict | Notes                                                                                            |
+| ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------ |
+| Multi-tenancy enforcement            | ✅      | All DB queries scoped by `projectId`; cross-tenant endpoint returns 404 (no info leakage)        |
+| Idempotency at DB level              | ✅      | Unique constraint in place; constraint is dead on arrival until route populates `idempotencyKey` |
+| App isolation (no cross-app imports) | ✅      | Apps import only from `packages/`                                                                |
+| Stateless service design             | ✅      | No in-memory state; all state in PostgreSQL or Redis                                             |
+| Horizontal scalability feasibility   | ✅      | Stateless API, stateless worker; BullMQ supports multiple competing consumers                    |
+| Proper async decoupling              | ✅      | Ingestion never waits for delivery; enqueue failure is soft                                      |
+| Observability maturity               | ❌      | Only basic Pino request logs; no correlation IDs, no metrics, no tracing                         |
 
 ### Structural Weaknesses
 
@@ -76,6 +76,7 @@ The idempotency constraint at the DB layer (and queue dedup via `jobId`) are ful
 ### 2. Scope (What to Build or Refactor)
 
 In `apps/api/src/routes/webhooks.ts`:
+
 - Read `X-Idempotency-Key` header from the request on `POST /webhooks/:endpointId`
 - Pass it to the `Event` create call as `idempotencyKey`
 - Catch Prisma unique constraint violations (`P2002` on `[projectId, idempotencyKey]`) and return `409 Conflict` with the original `eventId` (idempotent response)
@@ -106,11 +107,11 @@ In `apps/api/src/routes/webhooks.ts`:
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Race condition: two concurrent requests with same key | DB unique constraint is the final arbiter; one 201 + one P2002 → 409 — correct |
-| Header value is an array (multiple `X-Idempotency-Key` headers) | Take first value, validate type |
-| Oversized key (>255 chars) | Return 400 from Zod schema validation |
+| Failure                                                         | Mitigation                                                                     |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Race condition: two concurrent requests with same key           | DB unique constraint is the final arbiter; one 201 + one P2002 → 409 — correct |
+| Header value is an array (multiple `X-Idempotency-Key` headers) | Take first value, validate type                                                |
+| Oversized key (>255 chars)                                      | Return 400 from Zod schema validation                                          |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
 
@@ -138,12 +139,14 @@ There is currently no way to know whether an event has been delivered, permanent
 ### 2. Scope (What to Build or Refactor)
 
 In `packages/db/prisma/schema.prisma`:
+
 - Add `EventStatus` enum: `PENDING`, `DELIVERED`, `FAILED`, `RETRYING`
 - Add `status EventStatus @default(PENDING)` to `Event`
 - Add `DeliveryAttempt` model: `id`, `eventId`, `projectId`, `attemptNumber`, `requestedAt`, `respondedAt?`, `statusCode?`, `success`, `errorMessage?`
 - Add migration
 
 In `packages/db/src/domain.ts`:
+
 - Add `EventStatus` re-export and `canTransition(from, to): boolean`
 - Valid transitions: `PENDING → RETRYING`, `PENDING → DELIVERED`, `PENDING → FAILED`, `RETRYING → DELIVERED`, `RETRYING → FAILED`, `RETRYING → RETRYING`
 - Terminal states: `DELIVERED`, `FAILED` — no further transitions
@@ -173,9 +176,9 @@ In `packages/db/src/domain.ts`:
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Migration on live system | `status` column has a default, existing rows get `PENDING` — safe |
+| Failure                  | Mitigation                                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------------------- |
+| Migration on live system | `status` column has a default, existing rows get `PENDING` — safe                                 |
 | Worker crashes mid-write | Enforce transactional writes: `Event.status` update + `DeliveryAttempt` insert in one transaction |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
@@ -202,6 +205,7 @@ The processor is a placeholder. This step implements actual HTTP delivery: makin
 ### 2. Scope (What to Build or Refactor)
 
 Replace the placeholder in `apps/worker/src/processor.ts`:
+
 - Make HTTP `POST` (or method from job data) to `job.data.url`
 - Forward `headers` and `body` from job data
 - Record `DeliveryAttempt` with status code, latency, and success flag
@@ -239,12 +243,12 @@ Replace the placeholder in `apps/worker/src/processor.ts`:
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Network timeout | `AbortSignal.timeout` throws `TimeoutError` → caught, recorded as failed attempt, re-thrown for BullMQ |
-| DNS failure / connection refused | Native `fetch` throws → same handling |
+| Failure                                        | Mitigation                                                                                                |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Network timeout                                | `AbortSignal.timeout` throws `TimeoutError` → caught, recorded as failed attempt, re-thrown for BullMQ    |
+| DNS failure / connection refused               | Native `fetch` throws → same handling                                                                     |
 | Prisma write failure after successful delivery | Delivery happened but status not recorded — on re-attempt, check if already `DELIVERED` and short-circuit |
-| Concurrent worker instances on same job | BullMQ locks prevent this — document as invariant |
+| Concurrent worker instances on same job        | BullMQ locks prevent this — document as invariant                                                         |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
 
@@ -300,10 +304,10 @@ Worker currently uses an ad-hoc `console.log`-based logger with no log levels, n
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| `correlationId` absent on old jobs in queue | Processor defaults to `job.id` if `correlationId` is undefined |
-| Log volume at high throughput | Pino is async-friendly; avoid synchronous log sinks in production |
+| Failure                                     | Mitigation                                                        |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| `correlationId` absent on old jobs in queue | Processor defaults to `job.id` if `correlationId` is undefined    |
+| Log volume at high throughput               | Pino is async-friendly; avoid synchronous log sinks in production |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
 
@@ -328,6 +332,7 @@ Without replay, any delivery failure requires manual intervention. A replay endp
 ### 2. Scope (What to Build or Refactor)
 
 Add to `apps/api/src/routes/webhooks.ts`:
+
 - `GET /webhooks/:endpointId/events` — paginated event list with `status`, `idempotencyKey`, `receivedAt`
 - `POST /webhooks/:endpointId/events/:eventId/replay` — re-enqueue a failed event
 
@@ -357,10 +362,10 @@ Add to `apps/api/src/routes/webhooks.ts`:
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Enqueue succeeds but status update fails | Use transaction scope; on re-attempt, processor checks existing status |
-| Endpoint URL changed since original delivery | Replay uses latest URL — document this as expected behavior |
+| Failure                                      | Mitigation                                                             |
+| -------------------------------------------- | ---------------------------------------------------------------------- |
+| Enqueue succeeds but status update fails     | Use transaction scope; on re-attempt, processor checks existing status |
+| Endpoint URL changed since original delivery | Replay uses latest URL — document this as expected behavior            |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
 
@@ -411,10 +416,10 @@ The ingestion API has no protection against burst traffic or per-tenant abuse. A
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Redis unavailable | Configure `@fastify/rate-limit` to fail open — log warning, allow request |
-| Slight over-counting across replicas | Acceptable eventual consistency — document as known characteristic |
+| Failure                              | Mitigation                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| Redis unavailable                    | Configure `@fastify/rate-limit` to fail open — log warning, allow request |
+| Slight over-counting across replicas | Acceptable eventual consistency — document as known characteristic        |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
 
@@ -467,10 +472,10 @@ Currently any HTTP caller can deliver to any endpoint if they know the project k
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Missing signature header when secret is set | Return 401 with message "Signature required" |
-| Raw body unavailable | Test Fastify content-type parser boundary explicitly |
+| Failure                                     | Mitigation                                           |
+| ------------------------------------------- | ---------------------------------------------------- |
+| Missing signature header when secret is set | Return 401 with message "Signature required"         |
+| Raw body unavailable                        | Test Fastify content-type parser boundary explicitly |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
 
@@ -498,13 +503,13 @@ The system has no metrics. There is no way to observe delivery success rates, qu
 
 Add Prometheus-compatible metrics using `prom-client`:
 
-| Metric | Type | Labels |
-|---|---|---|
-| `webhook_events_received_total` | Counter | `project_id`, `status` |
-| `webhook_delivery_attempts_total` | Counter | `project_id`, `outcome` (success/failure/timeout) |
-| `webhook_delivery_duration_ms` | Histogram | `project_id`, `outcome` |
-| `webhook_queue_depth` | Gauge | — (scraped from BullMQ queue count) |
-| `webhook_events_status_total` | Gauge | `status` (PENDING/DELIVERED/FAILED/RETRYING) |
+| Metric                            | Type      | Labels                                            |
+| --------------------------------- | --------- | ------------------------------------------------- |
+| `webhook_events_received_total`   | Counter   | `project_id`, `status`                            |
+| `webhook_delivery_attempts_total` | Counter   | `project_id`, `outcome` (success/failure/timeout) |
+| `webhook_delivery_duration_ms`    | Histogram | `project_id`, `outcome`                           |
+| `webhook_queue_depth`             | Gauge     | — (scraped from BullMQ queue count)               |
+| `webhook_events_status_total`     | Gauge     | `status` (PENDING/DELIVERED/FAILED/RETRYING)      |
 
 ### 3. Architectural Constraints
 
@@ -531,9 +536,9 @@ Add Prometheus-compatible metrics using `prom-client`:
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Metrics registry error | Wrap in try/catch — must not crash the service |
+| Failure                 | Mitigation                                                             |
+| ----------------------- | ---------------------------------------------------------------------- |
+| Metrics registry error  | Wrap in try/catch — must not crash the service                         |
 | High cardinality labels | Enforce bounded label sets; reject unbounded values at definition time |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
@@ -591,9 +596,9 @@ No Dockerfiles or deployment configs exist. The system cannot be deployed to any
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| Prisma migration not run at startup | `prisma migrate deploy` in API entrypoint before server start |
+| Failure                             | Mitigation                                                                       |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| Prisma migration not run at startup | `prisma migrate deploy` in API entrypoint before server start                    |
 | Missing env vars at container start | Apps call `process.exit(1)` on Zod parse failure — works correctly in containers |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
@@ -645,9 +650,9 @@ Before declaring production readiness, the system must demonstrate it can handle
 
 ### 6. Failure Modes to Consider
 
-| Failure | Mitigation |
-|---|---|
-| DB down during ingest | Event cannot be stored → API 503; no enqueue (correct — never enqueue without an event ID) |
+| Failure                   | Mitigation                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| DB down during ingest     | Event cannot be stored → API 503; no enqueue (correct — never enqueue without an event ID)       |
 | Redis down during enqueue | Event stored but not queued → document as known gap; plan reconciliation job in future iteration |
 
 ### 7. Gateway Tests (Must Pass Before Proceeding)
