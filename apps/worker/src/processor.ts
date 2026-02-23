@@ -1,6 +1,5 @@
 import type { Job, WebhookDeliveryJobData } from "@repo/queue";
-import type { PrismaClient } from "@repo/db";
-import { EventStatus, canTransition } from "@repo/db";
+import { EventStatus, canTransition, type PrismaClient } from "@repo/db";
 
 export interface ProcessorContext {
   logger: {
