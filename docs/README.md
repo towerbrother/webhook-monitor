@@ -27,7 +27,7 @@ Infrastructure setup, deployment, and operational concerns.
 - Monitoring and observability
 - Backup and disaster recovery
 
-### [Development Workflows](./workflows.md)
+### [Development Workflows](./development.md)
 
 Developer workflows, git conventions, and contribution guidelines.
 
@@ -49,8 +49,8 @@ Developer workflows, git conventions, and contribution guidelines.
 | CI/CD pipeline    | [automation.md](./automation.md)         | Continuous Integration |
 | Deployment        | [infrastructure.md](./infrastructure.md) | Deployment Strategy    |
 | Environment setup | [infrastructure.md](./infrastructure.md) | Configuration          |
-| PR process        | [workflows.md](./workflows.md)           | Pull Requests          |
-| Git conventions   | [workflows.md](./workflows.md)           | Git Strategy           |
+| PR process        | [development.md](./development.md)       | Pull Requests          |
+| Git conventions   | [development.md](./development.md)       | Git Strategy           |
 
 ---
 

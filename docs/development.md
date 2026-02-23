@@ -333,7 +333,7 @@ Relates to #456
 
 **Prerequisites:**
 
-- Node.js >= 22 (per `package.json` engines requirement)
+- Node.js >= 24.13.1 (per `package.json` engines requirement)
 - pnpm 10.28.2 (exact version, enforced by `packageManager` field)
 - PostgreSQL (local or remote)
 - Redis (local or remote)
