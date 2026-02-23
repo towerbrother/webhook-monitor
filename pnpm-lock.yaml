@@ -22,7 +22,7 @@ importers:
         specifier: ^3.8.1
         version: 3.8.1
       turbo:
-        specifier: ^2.8.9
+        specifier: ^2.8.10
         version: 2.8.10
       typescript:
         specifier: 5.9.3
