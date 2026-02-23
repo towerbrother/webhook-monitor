@@ -8,6 +8,7 @@ import {
   isForeignKeyConstraintError,
   uniqueId,
 } from "./helpers.js";
+import { EventStatus } from "../domain.js";
 
 // Skip tests if DATABASE_URL is not set
 const skipTests = !process.env.DATABASE_URL;
@@ -199,6 +200,143 @@ describe.skipIf(skipTests)("Schema Constraints", () => {
       });
 
       expect(deletedEvent).toBeNull();
+    });
+
+    it("should cascade delete DeliveryAttempts when Event is deleted", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
+
+      const attempt = await prisma.deliveryAttempt.create({
+        data: {
+          eventId: event.id,
+          projectId: project.id,
+          attemptNumber: 1,
+          requestedAt: new Date(),
+          success: false,
+          errorMessage: "Connection refused",
+        },
+      });
+
+      await prisma.event.delete({ where: { id: event.id } });
+
+      const deletedAttempt = await prisma.deliveryAttempt.findUnique({
+        where: { id: attempt.id },
+      });
+      expect(deletedAttempt).toBeNull();
+    });
+  });
+
+  describe("Event Status", () => {
+    it("should default Event.status to PENDING", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
+
+      expect(event.status).toBe(EventStatus.PENDING);
+    });
+
+    it("should allow updating Event.status through valid transitions", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
+
+      const updated = await prisma.event.update({
+        where: { id: event.id },
+        data: { status: EventStatus.DELIVERED },
+      });
+
+      expect(updated.status).toBe(EventStatus.DELIVERED);
+    });
+
+    it("should persist all EventStatus values", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+
+      for (const status of [
+        EventStatus.PENDING,
+        EventStatus.RETRYING,
+        EventStatus.DELIVERED,
+        EventStatus.FAILED,
+      ]) {
+        const event = await createTestEvent(prisma, project.id, endpoint.id);
+        const updated = await prisma.event.update({
+          where: { id: event.id },
+          data: { status },
+        });
+        expect(updated.status).toBe(status);
+      }
+    });
+  });
+
+  describe("DeliveryAttempt", () => {
+    it("should create a DeliveryAttempt linked to an Event", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
+
+      const attempt = await prisma.deliveryAttempt.create({
+        data: {
+          eventId: event.id,
+          projectId: project.id,
+          attemptNumber: 1,
+          requestedAt: new Date(),
+          respondedAt: new Date(),
+          statusCode: 200,
+          success: true,
+        },
+      });
+
+      expect(attempt.id).toBeDefined();
+      expect(attempt.eventId).toBe(event.id);
+      expect(attempt.projectId).toBe(project.id);
+      expect(attempt.attemptNumber).toBe(1);
+      expect(attempt.success).toBe(true);
+      expect(attempt.statusCode).toBe(200);
+    });
+
+    it("should allow optional fields to be null", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
+
+      const attempt = await prisma.deliveryAttempt.create({
+        data: {
+          eventId: event.id,
+          projectId: project.id,
+          attemptNumber: 1,
+          requestedAt: new Date(),
+          success: false,
+          errorMessage: "Connection refused",
+        },
+      });
+
+      expect(attempt.respondedAt).toBeNull();
+      expect(attempt.statusCode).toBeNull();
+      expect(attempt.errorMessage).toBe("Connection refused");
+    });
+
+    it("should reject invalid eventId (FK constraint)", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+
+      await expect(
+        prisma.deliveryAttempt.create({
+          data: {
+            eventId: "non_existent_event_id",
+            projectId: project.id,
+            attemptNumber: 1,
+            requestedAt: new Date(),
+            success: false,
+          },
+        })
+      ).rejects.toSatisfy(isForeignKeyConstraintError);
     });
   });
 

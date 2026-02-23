@@ -11,4 +11,5 @@
 export type * from './models/Project.js'
 export type * from './models/WebhookEndpoint.js'
 export type * from './models/Event.js'
+export type * from './models/DeliveryAttempt.js'
 export type * from './commonInputTypes.js'

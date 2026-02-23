@@ -53,7 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   Project: 'Project',
   WebhookEndpoint: 'WebhookEndpoint',
-  Event: 'Event'
+  Event: 'Event',
+  DeliveryAttempt: 'DeliveryAttempt'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -98,6 +99,7 @@ export const EventScalarFieldEnum = {
   endpointId: 'endpointId',
   projectId: 'projectId',
   idempotencyKey: 'idempotencyKey',
+  status: 'status',
   method: 'method',
   headers: 'headers',
   body: 'body',
@@ -105,6 +107,21 @@ export const EventScalarFieldEnum = {
 } as const
 
 export type EventScalarFieldEnum = (typeof EventScalarFieldEnum)[keyof typeof EventScalarFieldEnum]
+
+
+export const DeliveryAttemptScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  projectId: 'projectId',
+  attemptNumber: 'attemptNumber',
+  requestedAt: 'requestedAt',
+  respondedAt: 'respondedAt',
+  statusCode: 'statusCode',
+  success: 'success',
+  errorMessage: 'errorMessage'
+} as const
+
+export type DeliveryAttemptScalarFieldEnum = (typeof DeliveryAttemptScalarFieldEnum)[keyof typeof DeliveryAttemptScalarFieldEnum]
 
 
 export const SortOrder = {
