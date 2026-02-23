@@ -90,7 +90,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: pnpm turbo lint
+        run: pnpm turbo lint -- --max-warnings 0
 
   check-types:
     name: Type Check
