@@ -20,9 +20,9 @@
 | Idempotency enforcement (queue dedup)           | ✅ Fully implemented     | `jobId = eventId` prevents duplicate BullMQ jobs                                                  |
 | Queue integration + retry config                | ✅ Fully implemented     | `webhook-delivery` queue, 5 attempts, exponential backoff from 1 s, job ID dedup                  |
 | Worker process scaffolding                      | ✅ Fully implemented     | Concurrency 10, graceful shutdown on `SIGTERM`/`SIGINT`, job event logging                        |
-| HTTP delivery logic                             | ❌ Not implemented       | `processWebhookDelivery` is a 100 ms `setTimeout` placeholder                                     |
-| Delivery attempt persistence / state machine    | ❌ Not implemented       | No `status` field on `Event`, no `DeliveryAttempt` model, no state transitions                    |
-| Retry enforcement at processor level            | ⚠️ Partially implemented | BullMQ config correct; processor never throws, so BullMQ retries are never triggered              |
+| HTTP delivery logic                             | ✅ Fully implemented     | `processWebhookDelivery` uses native `fetch` with `AbortSignal.timeout(30_000)`                   |
+| Delivery attempt persistence / state machine    | ✅ Fully implemented     | `DeliveryAttempt` created + `Event.status` updated in single Prisma transaction                   |
+| Retry enforcement at processor level            | ✅ Fully implemented     | `DeliveryError` thrown on non-2xx; BullMQ exponential backoff triggers retries                    |
 | Replay capability                               | ❌ Not implemented       | No re-enqueue endpoint or mechanism                                                               |
 | Structured logging — API                        | ✅ Fully implemented     | Pino via Fastify with `pino-pretty` in dev                                                        |
 | Structured logging — Worker                     | ⚠️ Partially implemented | Ad-hoc `console.log` + JSON; Pino planned but absent                                              |
@@ -51,15 +51,15 @@
 ### Structural Weaknesses
 
 1. **Idempotency mechanism is architecturally wired but operationally disabled** — the DB constraint and queue dedup exist, but the route never reads or writes `idempotencyKey`, making the entire subsystem inert.
-2. **Processor never throws** — BullMQ retry config is present, but since the placeholder never throws an error, retries are never triggered. Any real delivery failure will be silently swallowed once HTTP delivery is added unless the processor is written to propagate errors properly.
+2. ~~**Processor never throws**~~ — ✅ **Resolved in Step 3:** `DeliveryError` is thrown on any non-2xx response, enabling BullMQ retries.
 3. **Worker logger is not Pino** — inconsistent log format between API and worker; no structured fields, no log levels, no correlation ID support.
 4. **No request validation** — routes accept any shape of body/params. Required by `apps/api/AGENTS.md` but not implemented.
-5. **No `Event.status` field** — there is no way to know whether an event was delivered, failed permanently, or is pending. Replay and observability both depend on this.
+5. ~~**No `Event.status` field**~~ — ✅ **Resolved in Step 2 & 3:** `EventStatus` enum, `status` field, and `DeliveryAttempt` model are implemented; processor updates state transactionally.
 
 ### Current Stage
 
-> **The system is currently at Stage 4 (Async Stage) — tail end.**  
-> Infrastructure, domain, and ingestion scaffolding are structurally sound. Queue configuration and worker process scaffolding are complete. The processor is a placeholder; delivery has never begun. Production hardening and deployment are entirely absent.
+> **The system is currently at Stage 5 — HTTP Delivery complete.**  
+> Infrastructure, domain, ingestion, and delivery engine are all operational. The processor makes real HTTP calls, records `DeliveryAttempt` records, and drives the `Event` state machine. Remaining work: Pino logger in worker, correlation IDs, replay endpoint, rate limiting, HMAC verification, metrics, Dockerfiles, and load validation.
 
 ---
 
@@ -223,15 +223,15 @@ Replace the placeholder in `apps/worker/src/processor.ts`:
 
 ### 4. Implementation Checklist
 
-- [ ] Add `@repo/db` dependency to `apps/worker/package.json`
-- [ ] Add `DATABASE_URL` env var to `apps/worker/src/env.ts`
-- [ ] In `apps/worker/src/index.ts`: instantiate `createPrismaClient` and pass `prisma` via job context; include in graceful shutdown sequence
-- [ ] Update `processWebhookDelivery` signature to accept `{ logger, prisma }` context
-- [ ] Implement HTTP delivery: `fetch(url, { method, headers, body, signal: AbortSignal.timeout(30_000) })`
-- [ ] Record `DeliveryAttempt`: `eventId`, `projectId`, `attemptNumber: job.attemptsMade + 1`, `requestedAt`, `respondedAt`, `statusCode`, `success: res.ok`, duration
-- [ ] Update `Event.status` in same transaction: `DELIVERED` (2xx and not already at max attempts), `FAILED` (BullMQ `isFailed` / last attempt), `RETRYING` (non-2xx, not last)
-- [ ] Throw `DeliveryError extends Error` on non-2xx response so BullMQ retries
-- [ ] Update `apps/worker/src/__tests__/processor.test.ts` with mocked `fetch` and `prisma`
+- [x] Add `@repo/db` dependency to `apps/worker/package.json`
+- [x] Add `DATABASE_URL` env var to `apps/worker/src/env.ts`
+- [x] In `apps/worker/src/index.ts`: instantiate `createPrismaClient` and pass `prisma` via job context; include in graceful shutdown sequence
+- [x] Update `processWebhookDelivery` signature to accept `{ logger, prisma }` context
+- [x] Implement HTTP delivery: `fetch(url, { method, headers, body, signal: AbortSignal.timeout(30_000) })`
+- [x] Record `DeliveryAttempt`: `eventId`, `projectId`, `attemptNumber: job.attemptsMade + 1`, `requestedAt`, `respondedAt`, `statusCode`, `success: res.ok`, duration
+- [x] Update `Event.status` in same transaction: `DELIVERED` (2xx and not already at max attempts), `FAILED` (BullMQ `isFailed` / last attempt), `RETRYING` (non-2xx, not last)
+- [x] Throw `DeliveryError extends Error` on non-2xx response so BullMQ retries
+- [x] Update `apps/worker/src/__tests__/processor.test.ts` with mocked `fetch` and `prisma`
 - [ ] Add worker integration test: enqueue real job → verify `DeliveryAttempt` created and `Event.status = DELIVERED`
 
 ### 5. Invariants to Enforce
@@ -694,7 +694,7 @@ Before declaring production readiness, the system must demonstrate it can handle
 
 - [ ] (**Step 1**) Populate `Event.idempotencyKey` from `X-Idempotency-Key` header in `apps/api/src/routes/webhooks.ts`
 - [ ] (**Step 1**) Add Zod body/params validation to all webhook routes
-- [ ] (**Step 3**) Add `DATABASE_URL` env var to `apps/worker/src/env.ts`
+- [x] (**Step 3**) Add `DATABASE_URL` env var to `apps/worker/src/env.ts`
 - [ ] (**Step 4**) Replace ad-hoc worker logger with Pino instance in `apps/worker/src/index.ts`
 - [ ] (**Step 4**) Add `correlationId` to `WebhookDeliveryJobData` and thread it through ingest → queue → processor
 
@@ -704,9 +704,9 @@ Before declaring production readiness, the system must demonstrate it can handle
 - [ ] (**Step 2**) `EventStatus` enum + `status` field on `Event` — migration
 - [ ] (**Step 2**) `DeliveryAttempt` model — migration
 - [ ] (**Step 2**) `canTransition` state machine helper + unit tests
-- [ ] (**Step 3**) HTTP delivery in processor (`fetch` to endpoint URL)
-- [ ] (**Step 3**) `DeliveryAttempt` write + `Event.status` update in processor (transactional)
-- [ ] (**Step 3**) Processor throws on non-2xx (enables BullMQ retry)
+- [x] (**Step 3**) HTTP delivery in processor (`fetch` to endpoint URL)
+- [x] (**Step 3**) `DeliveryAttempt` write + `Event.status` update in processor (transactional)
+- [x] (**Step 3**) Processor throws on non-2xx (enables BullMQ retry)
 - [ ] (**Step 4**) Pino in worker + `LOG_LEVEL` env var in both API and worker
 - [ ] (**Step 4**) Correlation ID propagation end-to-end
 - [ ] (**Step 5**) `GET /webhooks/:endpointId/events` list endpoint
