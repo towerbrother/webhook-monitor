@@ -29,6 +29,7 @@ export type EventMinAggregateOutputType = {
   endpointId: string | null
   projectId: string | null
   idempotencyKey: string | null
+  status: $Enums.EventStatus | null
   method: string | null
   receivedAt: Date | null
 }
@@ -38,6 +39,7 @@ export type EventMaxAggregateOutputType = {
   endpointId: string | null
   projectId: string | null
   idempotencyKey: string | null
+  status: $Enums.EventStatus | null
   method: string | null
   receivedAt: Date | null
 }
@@ -47,6 +49,7 @@ export type EventCountAggregateOutputType = {
   endpointId: number
   projectId: number
   idempotencyKey: number
+  status: number
   method: number
   headers: number
   body: number
@@ -60,6 +63,7 @@ export type EventMinAggregateInputType = {
   endpointId?: true
   projectId?: true
   idempotencyKey?: true
+  status?: true
   method?: true
   receivedAt?: true
 }
@@ -69,6 +73,7 @@ export type EventMaxAggregateInputType = {
   endpointId?: true
   projectId?: true
   idempotencyKey?: true
+  status?: true
   method?: true
   receivedAt?: true
 }
@@ -78,6 +83,7 @@ export type EventCountAggregateInputType = {
   endpointId?: true
   projectId?: true
   idempotencyKey?: true
+  status?: true
   method?: true
   headers?: true
   body?: true
@@ -162,6 +168,7 @@ export type EventGroupByOutputType = {
   endpointId: string
   projectId: string
   idempotencyKey: string | null
+  status: $Enums.EventStatus
   method: string
   headers: runtime.JsonValue
   body: runtime.JsonValue | null
@@ -194,12 +201,14 @@ export type EventWhereInput = {
   endpointId?: Prisma.StringFilter<"Event"> | string
   projectId?: Prisma.StringFilter<"Event"> | string
   idempotencyKey?: Prisma.StringNullableFilter<"Event"> | string | null
+  status?: Prisma.EnumEventStatusFilter<"Event"> | $Enums.EventStatus
   method?: Prisma.StringFilter<"Event"> | string
   headers?: Prisma.JsonFilter<"Event">
   body?: Prisma.JsonNullableFilter<"Event">
   receivedAt?: Prisma.DateTimeFilter<"Event"> | Date | string
   endpoint?: Prisma.XOR<Prisma.WebhookEndpointScalarRelationFilter, Prisma.WebhookEndpointWhereInput>
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
+  deliveryAttempts?: Prisma.DeliveryAttemptListRelationFilter
 }
 
 export type EventOrderByWithRelationInput = {
@@ -207,12 +216,14 @@ export type EventOrderByWithRelationInput = {
   endpointId?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  status?: Prisma.SortOrder
   method?: Prisma.SortOrder
   headers?: Prisma.SortOrder
   body?: Prisma.SortOrderInput | Prisma.SortOrder
   receivedAt?: Prisma.SortOrder
   endpoint?: Prisma.WebhookEndpointOrderByWithRelationInput
   project?: Prisma.ProjectOrderByWithRelationInput
+  deliveryAttempts?: Prisma.DeliveryAttemptOrderByRelationAggregateInput
 }
 
 export type EventWhereUniqueInput = Prisma.AtLeast<{
@@ -224,12 +235,14 @@ export type EventWhereUniqueInput = Prisma.AtLeast<{
   endpointId?: Prisma.StringFilter<"Event"> | string
   projectId?: Prisma.StringFilter<"Event"> | string
   idempotencyKey?: Prisma.StringNullableFilter<"Event"> | string | null
+  status?: Prisma.EnumEventStatusFilter<"Event"> | $Enums.EventStatus
   method?: Prisma.StringFilter<"Event"> | string
   headers?: Prisma.JsonFilter<"Event">
   body?: Prisma.JsonNullableFilter<"Event">
   receivedAt?: Prisma.DateTimeFilter<"Event"> | Date | string
   endpoint?: Prisma.XOR<Prisma.WebhookEndpointScalarRelationFilter, Prisma.WebhookEndpointWhereInput>
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
+  deliveryAttempts?: Prisma.DeliveryAttemptListRelationFilter
 }, "id" | "projectId_idempotencyKey">
 
 export type EventOrderByWithAggregationInput = {
@@ -237,6 +250,7 @@ export type EventOrderByWithAggregationInput = {
   endpointId?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  status?: Prisma.SortOrder
   method?: Prisma.SortOrder
   headers?: Prisma.SortOrder
   body?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -254,6 +268,7 @@ export type EventScalarWhereWithAggregatesInput = {
   endpointId?: Prisma.StringWithAggregatesFilter<"Event"> | string
   projectId?: Prisma.StringWithAggregatesFilter<"Event"> | string
   idempotencyKey?: Prisma.StringNullableWithAggregatesFilter<"Event"> | string | null
+  status?: Prisma.EnumEventStatusWithAggregatesFilter<"Event"> | $Enums.EventStatus
   method?: Prisma.StringWithAggregatesFilter<"Event"> | string
   headers?: Prisma.JsonWithAggregatesFilter<"Event">
   body?: Prisma.JsonNullableWithAggregatesFilter<"Event">
@@ -263,12 +278,14 @@ export type EventScalarWhereWithAggregatesInput = {
 export type EventCreateInput = {
   id?: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Date | string
   endpoint: Prisma.WebhookEndpointCreateNestedOneWithoutEventsInput
   project: Prisma.ProjectCreateNestedOneWithoutEventsInput
+  deliveryAttempts?: Prisma.DeliveryAttemptCreateNestedManyWithoutEventInput
 }
 
 export type EventUncheckedCreateInput = {
@@ -276,21 +293,25 @@ export type EventUncheckedCreateInput = {
   endpointId: string
   projectId: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Date | string
+  deliveryAttempts?: Prisma.DeliveryAttemptUncheckedCreateNestedManyWithoutEventInput
 }
 
 export type EventUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endpoint?: Prisma.WebhookEndpointUpdateOneRequiredWithoutEventsNestedInput
   project?: Prisma.ProjectUpdateOneRequiredWithoutEventsNestedInput
+  deliveryAttempts?: Prisma.DeliveryAttemptUpdateManyWithoutEventNestedInput
 }
 
 export type EventUncheckedUpdateInput = {
@@ -298,10 +319,12 @@ export type EventUncheckedUpdateInput = {
   endpointId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deliveryAttempts?: Prisma.DeliveryAttemptUncheckedUpdateManyWithoutEventNestedInput
 }
 
 export type EventCreateManyInput = {
@@ -309,6 +332,7 @@ export type EventCreateManyInput = {
   endpointId: string
   projectId: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -318,6 +342,7 @@ export type EventCreateManyInput = {
 export type EventUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -329,6 +354,7 @@ export type EventUncheckedUpdateManyInput = {
   endpointId?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -355,6 +381,7 @@ export type EventCountOrderByAggregateInput = {
   endpointId?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
+  status?: Prisma.SortOrder
   method?: Prisma.SortOrder
   headers?: Prisma.SortOrder
   body?: Prisma.SortOrder
@@ -366,6 +393,7 @@ export type EventMaxOrderByAggregateInput = {
   endpointId?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
+  status?: Prisma.SortOrder
   method?: Prisma.SortOrder
   receivedAt?: Prisma.SortOrder
 }
@@ -375,8 +403,14 @@ export type EventMinOrderByAggregateInput = {
   endpointId?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
+  status?: Prisma.SortOrder
   method?: Prisma.SortOrder
   receivedAt?: Prisma.SortOrder
+}
+
+export type EventScalarRelationFilter = {
+  is?: Prisma.EventWhereInput
+  isNot?: Prisma.EventWhereInput
 }
 
 export type EventCreateNestedManyWithoutProjectInput = {
@@ -467,24 +501,46 @@ export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
 }
 
+export type EnumEventStatusFieldUpdateOperationsInput = {
+  set?: $Enums.EventStatus
+}
+
+export type EventCreateNestedOneWithoutDeliveryAttemptsInput = {
+  create?: Prisma.XOR<Prisma.EventCreateWithoutDeliveryAttemptsInput, Prisma.EventUncheckedCreateWithoutDeliveryAttemptsInput>
+  connectOrCreate?: Prisma.EventCreateOrConnectWithoutDeliveryAttemptsInput
+  connect?: Prisma.EventWhereUniqueInput
+}
+
+export type EventUpdateOneRequiredWithoutDeliveryAttemptsNestedInput = {
+  create?: Prisma.XOR<Prisma.EventCreateWithoutDeliveryAttemptsInput, Prisma.EventUncheckedCreateWithoutDeliveryAttemptsInput>
+  connectOrCreate?: Prisma.EventCreateOrConnectWithoutDeliveryAttemptsInput
+  upsert?: Prisma.EventUpsertWithoutDeliveryAttemptsInput
+  connect?: Prisma.EventWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.EventUpdateToOneWithWhereWithoutDeliveryAttemptsInput, Prisma.EventUpdateWithoutDeliveryAttemptsInput>, Prisma.EventUncheckedUpdateWithoutDeliveryAttemptsInput>
+}
+
 export type EventCreateWithoutProjectInput = {
   id?: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Date | string
   endpoint: Prisma.WebhookEndpointCreateNestedOneWithoutEventsInput
+  deliveryAttempts?: Prisma.DeliveryAttemptCreateNestedManyWithoutEventInput
 }
 
 export type EventUncheckedCreateWithoutProjectInput = {
   id?: string
   endpointId: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Date | string
+  deliveryAttempts?: Prisma.DeliveryAttemptUncheckedCreateNestedManyWithoutEventInput
 }
 
 export type EventCreateOrConnectWithoutProjectInput = {
@@ -521,6 +577,7 @@ export type EventScalarWhereInput = {
   endpointId?: Prisma.StringFilter<"Event"> | string
   projectId?: Prisma.StringFilter<"Event"> | string
   idempotencyKey?: Prisma.StringNullableFilter<"Event"> | string | null
+  status?: Prisma.EnumEventStatusFilter<"Event"> | $Enums.EventStatus
   method?: Prisma.StringFilter<"Event"> | string
   headers?: Prisma.JsonFilter<"Event">
   body?: Prisma.JsonNullableFilter<"Event">
@@ -530,21 +587,25 @@ export type EventScalarWhereInput = {
 export type EventCreateWithoutEndpointInput = {
   id?: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutEventsInput
+  deliveryAttempts?: Prisma.DeliveryAttemptCreateNestedManyWithoutEventInput
 }
 
 export type EventUncheckedCreateWithoutEndpointInput = {
   id?: string
   projectId: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Date | string
+  deliveryAttempts?: Prisma.DeliveryAttemptUncheckedCreateNestedManyWithoutEventInput
 }
 
 export type EventCreateOrConnectWithoutEndpointInput = {
@@ -573,10 +634,75 @@ export type EventUpdateManyWithWhereWithoutEndpointInput = {
   data: Prisma.XOR<Prisma.EventUpdateManyMutationInput, Prisma.EventUncheckedUpdateManyWithoutEndpointInput>
 }
 
+export type EventCreateWithoutDeliveryAttemptsInput = {
+  id?: string
+  idempotencyKey?: string | null
+  status?: $Enums.EventStatus
+  method: string
+  headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  receivedAt?: Date | string
+  endpoint: Prisma.WebhookEndpointCreateNestedOneWithoutEventsInput
+  project: Prisma.ProjectCreateNestedOneWithoutEventsInput
+}
+
+export type EventUncheckedCreateWithoutDeliveryAttemptsInput = {
+  id?: string
+  endpointId: string
+  projectId: string
+  idempotencyKey?: string | null
+  status?: $Enums.EventStatus
+  method: string
+  headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  receivedAt?: Date | string
+}
+
+export type EventCreateOrConnectWithoutDeliveryAttemptsInput = {
+  where: Prisma.EventWhereUniqueInput
+  create: Prisma.XOR<Prisma.EventCreateWithoutDeliveryAttemptsInput, Prisma.EventUncheckedCreateWithoutDeliveryAttemptsInput>
+}
+
+export type EventUpsertWithoutDeliveryAttemptsInput = {
+  update: Prisma.XOR<Prisma.EventUpdateWithoutDeliveryAttemptsInput, Prisma.EventUncheckedUpdateWithoutDeliveryAttemptsInput>
+  create: Prisma.XOR<Prisma.EventCreateWithoutDeliveryAttemptsInput, Prisma.EventUncheckedCreateWithoutDeliveryAttemptsInput>
+  where?: Prisma.EventWhereInput
+}
+
+export type EventUpdateToOneWithWhereWithoutDeliveryAttemptsInput = {
+  where?: Prisma.EventWhereInput
+  data: Prisma.XOR<Prisma.EventUpdateWithoutDeliveryAttemptsInput, Prisma.EventUncheckedUpdateWithoutDeliveryAttemptsInput>
+}
+
+export type EventUpdateWithoutDeliveryAttemptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
+  method?: Prisma.StringFieldUpdateOperationsInput | string
+  headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endpoint?: Prisma.WebhookEndpointUpdateOneRequiredWithoutEventsNestedInput
+  project?: Prisma.ProjectUpdateOneRequiredWithoutEventsNestedInput
+}
+
+export type EventUncheckedUpdateWithoutDeliveryAttemptsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  endpointId?: Prisma.StringFieldUpdateOperationsInput | string
+  projectId?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
+  method?: Prisma.StringFieldUpdateOperationsInput | string
+  headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type EventCreateManyProjectInput = {
   id?: string
   endpointId: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -586,27 +712,32 @@ export type EventCreateManyProjectInput = {
 export type EventUpdateWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endpoint?: Prisma.WebhookEndpointUpdateOneRequiredWithoutEventsNestedInput
+  deliveryAttempts?: Prisma.DeliveryAttemptUpdateManyWithoutEventNestedInput
 }
 
 export type EventUncheckedUpdateWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   endpointId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deliveryAttempts?: Prisma.DeliveryAttemptUncheckedUpdateManyWithoutEventNestedInput
 }
 
 export type EventUncheckedUpdateManyWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   endpointId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -617,6 +748,7 @@ export type EventCreateManyEndpointInput = {
   id?: string
   projectId: string
   idempotencyKey?: string | null
+  status?: $Enums.EventStatus
   method: string
   headers: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -626,33 +758,67 @@ export type EventCreateManyEndpointInput = {
 export type EventUpdateWithoutEndpointInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutEventsNestedInput
+  deliveryAttempts?: Prisma.DeliveryAttemptUpdateManyWithoutEventNestedInput
 }
 
 export type EventUncheckedUpdateWithoutEndpointInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deliveryAttempts?: Prisma.DeliveryAttemptUncheckedUpdateManyWithoutEventNestedInput
 }
 
 export type EventUncheckedUpdateManyWithoutEndpointInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumEventStatusFieldUpdateOperationsInput | $Enums.EventStatus
   method?: Prisma.StringFieldUpdateOperationsInput | string
   headers?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   body?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+
+/**
+ * Count Type EventCountOutputType
+ */
+
+export type EventCountOutputType = {
+  deliveryAttempts: number
+}
+
+export type EventCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  deliveryAttempts?: boolean | EventCountOutputTypeCountDeliveryAttemptsArgs
+}
+
+/**
+ * EventCountOutputType without action
+ */
+export type EventCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EventCountOutputType
+   */
+  select?: Prisma.EventCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * EventCountOutputType without action
+ */
+export type EventCountOutputTypeCountDeliveryAttemptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.DeliveryAttemptWhereInput
+}
 
 
 export type EventSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -660,12 +826,15 @@ export type EventSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   endpointId?: boolean
   projectId?: boolean
   idempotencyKey?: boolean
+  status?: boolean
   method?: boolean
   headers?: boolean
   body?: boolean
   receivedAt?: boolean
   endpoint?: boolean | Prisma.WebhookEndpointDefaultArgs<ExtArgs>
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
+  deliveryAttempts?: boolean | Prisma.Event$deliveryAttemptsArgs<ExtArgs>
+  _count?: boolean | Prisma.EventCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["event"]>
 
 export type EventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -673,6 +842,7 @@ export type EventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   endpointId?: boolean
   projectId?: boolean
   idempotencyKey?: boolean
+  status?: boolean
   method?: boolean
   headers?: boolean
   body?: boolean
@@ -686,6 +856,7 @@ export type EventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   endpointId?: boolean
   projectId?: boolean
   idempotencyKey?: boolean
+  status?: boolean
   method?: boolean
   headers?: boolean
   body?: boolean
@@ -699,16 +870,19 @@ export type EventSelectScalar = {
   endpointId?: boolean
   projectId?: boolean
   idempotencyKey?: boolean
+  status?: boolean
   method?: boolean
   headers?: boolean
   body?: boolean
   receivedAt?: boolean
 }
 
-export type EventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "endpointId" | "projectId" | "idempotencyKey" | "method" | "headers" | "body" | "receivedAt", ExtArgs["result"]["event"]>
+export type EventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "endpointId" | "projectId" | "idempotencyKey" | "status" | "method" | "headers" | "body" | "receivedAt", ExtArgs["result"]["event"]>
 export type EventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   endpoint?: boolean | Prisma.WebhookEndpointDefaultArgs<ExtArgs>
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
+  deliveryAttempts?: boolean | Prisma.Event$deliveryAttemptsArgs<ExtArgs>
+  _count?: boolean | Prisma.EventCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type EventIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   endpoint?: boolean | Prisma.WebhookEndpointDefaultArgs<ExtArgs>
@@ -724,12 +898,14 @@ export type $EventPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   objects: {
     endpoint: Prisma.$WebhookEndpointPayload<ExtArgs>
     project: Prisma.$ProjectPayload<ExtArgs>
+    deliveryAttempts: Prisma.$DeliveryAttemptPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     endpointId: string
     projectId: string
     idempotencyKey: string | null
+    status: $Enums.EventStatus
     method: string
     headers: runtime.JsonValue
     body: runtime.JsonValue | null
@@ -1130,6 +1306,7 @@ export interface Prisma__EventClient<T, Null = never, ExtArgs extends runtime.Ty
   readonly [Symbol.toStringTag]: "PrismaPromise"
   endpoint<T extends Prisma.WebhookEndpointDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WebhookEndpointDefaultArgs<ExtArgs>>): Prisma.Prisma__WebhookEndpointClient<runtime.Types.Result.GetResult<Prisma.$WebhookEndpointPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   project<T extends Prisma.ProjectDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProjectDefaultArgs<ExtArgs>>): Prisma.Prisma__ProjectClient<runtime.Types.Result.GetResult<Prisma.$ProjectPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  deliveryAttempts<T extends Prisma.Event$deliveryAttemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Event$deliveryAttemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1163,6 +1340,7 @@ export interface EventFieldRefs {
   readonly endpointId: Prisma.FieldRef<"Event", 'String'>
   readonly projectId: Prisma.FieldRef<"Event", 'String'>
   readonly idempotencyKey: Prisma.FieldRef<"Event", 'String'>
+  readonly status: Prisma.FieldRef<"Event", 'EventStatus'>
   readonly method: Prisma.FieldRef<"Event", 'String'>
   readonly headers: Prisma.FieldRef<"Event", 'Json'>
   readonly body: Prisma.FieldRef<"Event", 'Json'>
@@ -1560,6 +1738,30 @@ export type EventDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Limit how many Events to delete.
    */
   limit?: number
+}
+
+/**
+ * Event.deliveryAttempts
+ */
+export type Event$deliveryAttemptsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the DeliveryAttempt
+   */
+  select?: Prisma.DeliveryAttemptSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the DeliveryAttempt
+   */
+  omit?: Prisma.DeliveryAttemptOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.DeliveryAttemptInclude<ExtArgs> | null
+  where?: Prisma.DeliveryAttemptWhereInput
+  orderBy?: Prisma.DeliveryAttemptOrderByWithRelationInput | Prisma.DeliveryAttemptOrderByWithRelationInput[]
+  cursor?: Prisma.DeliveryAttemptWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.DeliveryAttemptScalarFieldEnum | Prisma.DeliveryAttemptScalarFieldEnum[]
 }
 
 /**

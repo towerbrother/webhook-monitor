@@ -386,7 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   Project: 'Project',
   WebhookEndpoint: 'WebhookEndpoint',
-  Event: 'Event'
+  Event: 'Event',
+  DeliveryAttempt: 'DeliveryAttempt'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -402,7 +403,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "webhookEndpoint" | "event"
+    modelProps: "project" | "webhookEndpoint" | "event" | "deliveryAttempt"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    DeliveryAttempt: {
+      payload: Prisma.$DeliveryAttemptPayload<ExtArgs>
+      fields: Prisma.DeliveryAttemptFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.DeliveryAttemptFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.DeliveryAttemptFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>
+        }
+        findFirst: {
+          args: Prisma.DeliveryAttemptFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.DeliveryAttemptFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>
+        }
+        findMany: {
+          args: Prisma.DeliveryAttemptFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>[]
+        }
+        create: {
+          args: Prisma.DeliveryAttemptCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>
+        }
+        createMany: {
+          args: Prisma.DeliveryAttemptCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.DeliveryAttemptCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>[]
+        }
+        delete: {
+          args: Prisma.DeliveryAttemptDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>
+        }
+        update: {
+          args: Prisma.DeliveryAttemptUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>
+        }
+        deleteMany: {
+          args: Prisma.DeliveryAttemptDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.DeliveryAttemptUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.DeliveryAttemptUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>[]
+        }
+        upsert: {
+          args: Prisma.DeliveryAttemptUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$DeliveryAttemptPayload>
+        }
+        aggregate: {
+          args: Prisma.DeliveryAttemptAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateDeliveryAttempt>
+        }
+        groupBy: {
+          args: Prisma.DeliveryAttemptGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryAttemptGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.DeliveryAttemptCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.DeliveryAttemptCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -693,6 +768,7 @@ export const EventScalarFieldEnum = {
   endpointId: 'endpointId',
   projectId: 'projectId',
   idempotencyKey: 'idempotencyKey',
+  status: 'status',
   method: 'method',
   headers: 'headers',
   body: 'body',
@@ -700,6 +776,21 @@ export const EventScalarFieldEnum = {
 } as const
 
 export type EventScalarFieldEnum = (typeof EventScalarFieldEnum)[keyof typeof EventScalarFieldEnum]
+
+
+export const DeliveryAttemptScalarFieldEnum = {
+  id: 'id',
+  eventId: 'eventId',
+  projectId: 'projectId',
+  attemptNumber: 'attemptNumber',
+  requestedAt: 'requestedAt',
+  respondedAt: 'respondedAt',
+  statusCode: 'statusCode',
+  success: 'success',
+  errorMessage: 'errorMessage'
+} as const
+
+export type DeliveryAttemptScalarFieldEnum = (typeof DeliveryAttemptScalarFieldEnum)[keyof typeof DeliveryAttemptScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -785,6 +876,20 @@ export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaM
 
 
 /**
+ * Reference to a field of type 'EventStatus'
+ */
+export type EnumEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EventStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'EventStatus[]'
+ */
+export type ListEnumEventStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EventStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'Json'
  */
 export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
@@ -809,6 +914,27 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
+ * Reference to a field of type 'Float'
+ */
+export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
+    
+
+
+/**
+ * Reference to a field of type 'Float[]'
+ */
+export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
     
 
 /**
@@ -909,6 +1035,7 @@ export type GlobalOmitConfig = {
   project?: Prisma.ProjectOmit
   webhookEndpoint?: Prisma.WebhookEndpointOmit
   event?: Prisma.EventOmit
+  deliveryAttempt?: Prisma.DeliveryAttemptOmit
 }
 
 /* Types for Logging */

@@ -54,3 +54,8 @@ export type WebhookEndpoint = Prisma.WebhookEndpointModel
  * 
  */
 export type Event = Prisma.EventModel
+/**
+ * Model DeliveryAttempt
+ * 
+ */
+export type DeliveryAttempt = Prisma.DeliveryAttemptModel

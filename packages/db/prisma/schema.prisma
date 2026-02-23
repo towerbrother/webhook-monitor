@@ -52,6 +52,16 @@ model WebhookEndpoint {
 }
 
 // ============================================================================
+// EVENT STATUS - State machine for delivery lifecycle
+// ============================================================================
+enum EventStatus {
+  PENDING    // Received but not yet attempted
+  RETRYING   // At least one failed attempt, more retries remaining
+  DELIVERED  // Successfully delivered (terminal)
+  FAILED     // All retries exhausted, delivery failed (terminal)
+}
+
+// ============================================================================
 // EVENT - Immutable record of a received webhook
 // ============================================================================
 // Responsibility: Captures complete HTTP request data (headers, body, method)
@@ -61,22 +71,53 @@ model WebhookEndpoint {
 //   - event.projectId MUST equal event.endpoint.projectId (enforced in app)
 //   - Data is immutable once created (append-only log)
 //   - idempotencyKey is unique per project (prevents duplicate events)
+//   - status is the authoritative delivery state; transitions managed in app
 //
 model Event {
-  id             String   @id @default(cuid())
+  id             String      @id @default(cuid())
   endpointId     String
-  projectId      String   // Denormalized for query performance
-  idempotencyKey String?  // Optional key for deduplication (unique per project)
+  projectId      String      // Denormalized for query performance
+  idempotencyKey String?     // Optional key for deduplication (unique per project)
+  status         EventStatus @default(PENDING)
   method         String
   headers        Json
-  body           Json?    // Nullable - webhooks may have empty body
-  receivedAt     DateTime @default(now())
+  body           Json?       // Nullable - webhooks may have empty body
+  receivedAt     DateTime    @default(now())
 
-  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  endpoint         WebhookEndpoint  @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliveryAttempts DeliveryAttempt[]
 
   @@unique([projectId, idempotencyKey])
   @@index([projectId, endpointId])
+  @@index([projectId, status])
+}
+
+// ============================================================================
+// DELIVERY ATTEMPT - Append-only audit log of each HTTP delivery attempt
+// ============================================================================
+// Responsibility: Records every outbound HTTP attempt for an event
+// Ownership: Owned by Event (cascade delete)
+// Invariants:
+//   - Never updated or deleted (append-only)
+//   - projectId is denormalized for tenant-scoped queries without joins
+//   - attemptNumber matches BullMQ's attemptsMade + 1
+//
+model DeliveryAttempt {
+  id            String    @id @default(cuid())
+  eventId       String
+  projectId     String    // Denormalized for query performance
+  attemptNumber Int
+  requestedAt   DateTime
+  respondedAt   DateTime?
+  statusCode    Int?
+  success       Boolean
+  errorMessage  String?
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([projectId, eventId])
 }
 
 // ============================================================================
@@ -85,7 +126,9 @@ model Event {
 // Project (1) ──< has many >── (N) WebhookEndpoint
 //    │                               │
 //    └─< has many >──────────< belongs to >── Event
+//                                              │
+//                                    (1) ──< has many >── (N) DeliveryAttempt
 //
 // Cascade deletion:
-//   - Delete Project → deletes WebhookEndpoints → deletes Events
-//   - Delete WebhookEndpoint → deletes Events
+//   - Delete Project → deletes WebhookEndpoints → deletes Events → deletes DeliveryAttempts
+//   - Delete WebhookEndpoint → deletes Events → deletes DeliveryAttempts
