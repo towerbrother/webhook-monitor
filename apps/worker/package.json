@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@repo/db": "workspace:*",
     "@repo/queue": "workspace:*",
     "@repo/shared": "workspace:*",
     "ioredis": "^5.9.3",
