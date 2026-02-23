@@ -291,6 +291,201 @@ describe.skipIf(skipTests)("Webhook Ingestion API", () => {
       expect(body.projectId).toBe(project.id);
     });
   });
+
+  describe("Idempotency", () => {
+    it("should create event with idempotency key when header is provided", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}`,
+        headers: {
+          "x-project-key": project.projectKey,
+          "x-idempotency-key": "test-key-123",
+        },
+        payload: { test: true },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+
+      // Verify event has idempotency key
+      const event = await prisma.event.findUnique({
+        where: { id: body.eventId },
+      });
+
+      expect(event!.idempotencyKey).toBe("test-key-123");
+    });
+
+    it("should return 409 with original event when duplicate idempotency key is used", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+
+      // First request
+      const response1 = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}`,
+        headers: {
+          "x-project-key": project.projectKey,
+          "x-idempotency-key": "duplicate-test-key",
+        },
+        payload: { test: true },
+      });
+
+      expect(response1.statusCode).toBe(201);
+      const body1 = JSON.parse(response1.body);
+
+      // Second request with same idempotency key
+      const response2 = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}`,
+        headers: {
+          "x-project-key": project.projectKey,
+          "x-idempotency-key": "duplicate-test-key",
+        },
+        payload: { different: "payload" },
+      });
+
+      expect(response2.statusCode).toBe(409);
+      const body2 = JSON.parse(response2.body);
+
+      // Should return the original event
+      expect(body2.success).toBe(true);
+      expect(body2.eventId).toBe(body1.eventId);
+      expect(body2.receivedAt).toBe(body1.receivedAt);
+      expect(body2.duplicate).toBe(true);
+
+      // Verify only one event was created
+      const events = await prisma.event.findMany({
+        where: {
+          projectId: project.id,
+          idempotencyKey: "duplicate-test-key",
+        },
+      });
+      expect(events.length).toBe(1);
+    });
+
+    it("should allow same idempotency key across different projects", async () => {
+      const prisma = getTestPrisma();
+      const project1 = await createTestProject(prisma);
+      const project2 = await createTestProject(prisma);
+      const endpoint1 = await createTestEndpoint(prisma, project1.id);
+      const endpoint2 = await createTestEndpoint(prisma, project2.id);
+
+      // Request for project 1
+      const response1 = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint1.id}`,
+        headers: {
+          "x-project-key": project1.projectKey,
+          "x-idempotency-key": "shared-key",
+        },
+        payload: { test: true },
+      });
+
+      expect(response1.statusCode).toBe(201);
+      const body1 = JSON.parse(response1.body);
+
+      // Request for project 2 with same key
+      const response2 = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint2.id}`,
+        headers: {
+          "x-project-key": project2.projectKey,
+          "x-idempotency-key": "shared-key",
+        },
+        payload: { test: true },
+      });
+
+      expect(response2.statusCode).toBe(201);
+      const body2 = JSON.parse(response2.body);
+
+      // Different events should be created
+      expect(body2.eventId).not.toBe(body1.eventId);
+    });
+
+    it("should create new event when no idempotency key is provided", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+
+      // First request without idempotency key
+      const response1 = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}`,
+        headers: {
+          "x-project-key": project.projectKey,
+        },
+        payload: { test: true },
+      });
+
+      expect(response1.statusCode).toBe(201);
+      const body1 = JSON.parse(response1.body);
+
+      // Second request without idempotency key
+      const response2 = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}`,
+        headers: {
+          "x-project-key": project.projectKey,
+        },
+        payload: { test: true },
+      });
+
+      expect(response2.statusCode).toBe(201);
+      const body2 = JSON.parse(response2.body);
+
+      // Different events should be created
+      expect(body2.eventId).not.toBe(body1.eventId);
+    });
+
+    it("should return 400 when idempotency key exceeds 255 characters", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+
+      const longKey = "a".repeat(256);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}`,
+        headers: {
+          "x-project-key": project.projectKey,
+          "x-idempotency-key": longKey,
+        },
+        payload: { test: true },
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe("Bad Request");
+      expect(body.message).toBe("Invalid idempotency key");
+    });
+
+    it("should handle endpoint validation correctly", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+
+      // Empty endpoint ID in URL path returns validation error
+      const response = await app.inject({
+        method: "POST",
+        url: "/webhooks/",
+        headers: {
+          "x-project-key": project.projectKey,
+        },
+        payload: { test: true },
+      });
+
+      // Should return 400 for invalid (empty) endpoint ID
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.error).toBe("Bad Request");
+      expect(body.message).toBe("Invalid endpoint ID");
+    });
+  });
 });
 
 describe.skipIf(skipTests)("Health Check", () => {
