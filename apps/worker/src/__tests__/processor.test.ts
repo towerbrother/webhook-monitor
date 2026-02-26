@@ -209,13 +209,11 @@ describe("processWebhookDelivery", () => {
 
       vi.stubGlobal(
         "fetch",
-        vi
-          .fn()
-          .mockResolvedValue({
-            ok: false,
-            status: 503,
-            statusText: "Service Unavailable",
-          })
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 503,
+          statusText: "Service Unavailable",
+        })
       );
 
       // attemptsMade=0 means attempt 1 of 5 → not last
@@ -246,13 +244,11 @@ describe("processWebhookDelivery", () => {
 
       vi.stubGlobal(
         "fetch",
-        vi
-          .fn()
-          .mockResolvedValue({
-            ok: false,
-            status: 500,
-            statusText: "Internal Server Error",
-          })
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+        })
       );
 
       // attemptsMade=4 means attempt 5 of 5 → last attempt
@@ -283,13 +279,11 @@ describe("processWebhookDelivery", () => {
 
       vi.stubGlobal(
         "fetch",
-        vi
-          .fn()
-          .mockResolvedValue({
-            ok: false,
-            status: 404,
-            statusText: "Not Found",
-          })
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 404,
+          statusText: "Not Found",
+        })
       );
 
       await expect(
