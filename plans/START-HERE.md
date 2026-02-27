@@ -69,7 +69,7 @@ Then press Enter.
 **What will happen:**
 
 1. The computer will ask: "Do you want option 1 or 2?"
-   - Type `2` and press Enter (this uses Docker, which is safer)
+   - Type `2` and press Enter (this uses Docker sandbox - safer!)
 2. Ralph will wake up and:
    - Create a special branch called `ralph/autonomous` (this is Ralph's workspace!)
    - Check if everything is installed
@@ -106,6 +106,9 @@ Type this:
 6. Ralph tests it
 7. Ralph makes a commit
 8. Ralph goes to sleep
+9. Ralph tests it
+10. Ralph makes a commit
+11. Ralph goes to sleep
 
 You can watch what Ralph is doing! When he's done, check:
 
@@ -124,10 +127,16 @@ Now that you've seen Ralph work once, you can let him do MANY things while you g
 Type this:
 
 ```bash
-./plans/ralph.sh 20
+./plans/ralph.sh 20 sandbox
 ```
 
-This means: "Ralph, please do 20 things from the to-do list!"
+This means: "Ralph, please do 20 things from the to-do list in a Docker sandbox!"
+
+Or without sandbox:
+
+```bash
+./plans/ralph.sh 20
+```
 
 **What will happen:**
 
@@ -284,6 +293,11 @@ When you choose option `2` (Docker sandbox), Ralph runs inside a special contain
 - Can only work on the webhook-monitor project
 
 This is MUCH safer than letting Ralph run directly on your computer!
+
+To use sandboxes:
+
+- Choose option `2` during `ralph-init.sh` and `ralph-once.sh`
+- Add `sandbox` parameter: `./plans/ralph.sh 20 sandbox`
 
 ---
 

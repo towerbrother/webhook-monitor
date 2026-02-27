@@ -45,7 +45,7 @@ case $choice in
     echo ""
     echo "Running initialization with OpenCode on host..."
     echo ""
-    opencode -p "$(cat "$INIT_PROMPT")" --output-format text
+    opencode -p "$(cat "$INIT_PROMPT")"
     ;;
   2)
     echo ""
@@ -53,18 +53,14 @@ case $choice in
     echo ""
     # Check if docker is available
     if ! command -v docker &> /dev/null; then
-      echo "ERROR: Docker not found. Please install Docker Desktop 4.50+:" >&2
+      echo "ERROR: Docker not found. Please install Docker Desktop:" >&2
       echo "  https://docs.docker.com/desktop/install" >&2
       exit 1
     fi
     
-    docker sandbox run \
-      --cpus 2.0 \
-      --memory 4g \
-      --pids-limit 100 \
-      opencode \
-      -p "$(cat "$INIT_PROMPT")" \
-      --output-format text
+    # Run OpenCode in Docker sandbox
+    # The sandbox is automatically created and destroyed
+    docker sandbox run opencode "$SCRIPT_DIR/.." -- -p "$(cat "$INIT_PROMPT")"
     ;;
   *)
     echo "Invalid choice. Exiting." >&2

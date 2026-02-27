@@ -42,11 +42,14 @@ After initialization, start the Ralph loop:
 # Human-in-the-loop (one iteration, watch what happens)
 ./plans/ralph-once.sh
 
-# Fully autonomous (20 iterations max)
+# Fully autonomous (20 iterations max, direct execution)
 ./plans/ralph.sh 20
 
-# Fully autonomous (run until complete)
-./plans/ralph.sh
+# Fully autonomous (20 iterations in Docker sandbox - recommended)
+./plans/ralph.sh 20 sandbox
+
+# Fully autonomous (run until complete in sandbox)
+./plans/ralph.sh 999 sandbox
 ```
 
 Ralph will:
@@ -194,28 +197,47 @@ Only after ALL checks pass can the feature be marked `passes: true` in the PRD.
 
 See [`../docs/sandbox-spec.md`](../docs/sandbox-spec.md) for full security details.
 
-**Recommended:** Always run in Docker sandboxes for isolation:
+### Docker Sandbox (Recommended)
+
+Ralph supports running in Docker sandboxes for isolation:
 
 ```bash
-docker sandbox run \
-  --cpus 2.0 \
-  --memory 4g \
-  --pids-limit 100 \
-  opencode \
-  -p "$(cat plans/PROMPT.md)"
+# Run initialization in sandbox
+./plans/ralph-init.sh
+# Choose option 2
+
+# Run single iteration in sandbox
+./plans/ralph-once.sh
+# Choose option 2
+
+# Run autonomous loop in sandbox
+./plans/ralph.sh 20 sandbox
 ```
 
-**Resource limits:**
+**Benefits:**
 
-- 2 CPU cores
-- 4GB RAM
-- 100 process limit
-- Workspace-only file access
+- File access limited to workspace directory
+- Network isolation
+- Process isolation
+- Can't affect host system
 
-**Network restrictions:**
+**How it works:**
 
-- Allow: npm/pnpm registries, GitHub, localhost
-- Block: SSH, raw sockets, internal networks
+- Uses `docker sandbox run opencode <workspace>`
+- Automatically creates and manages sandbox
+- Workspace mounted at same path inside container
+- Git operations work seamlessly
+
+### Direct Execution
+
+If you prefer to run without Docker:
+
+```bash
+# Choose option 1 during interactive scripts
+# Or omit 'sandbox' parameter: ./plans/ralph.sh 20
+```
+
+OpenCode runs with your user permissions and has access to your file system.
 
 ---
 
