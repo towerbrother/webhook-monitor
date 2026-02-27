@@ -101,7 +101,7 @@
         "Logging endpoint object redacts signingSecret field",
         "All existing processor tests pass with new logger"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "correlation-id",

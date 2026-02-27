@@ -4,14 +4,7 @@ import { createPrismaClient } from "@repo/db";
 import { validateEnv } from "./env.js";
 import { processWebhookDelivery } from "./processor.js";
 import { RedisOptions } from "bullmq";
-
-// Simple console logger (Step 7 will add Pino)
-export const logger = {
-  info: (obj: Record<string, unknown>, msg: string) =>
-    console.log(JSON.stringify({ level: "info", msg, ...obj })),
-  error: (obj: Record<string, unknown>, msg: string) =>
-    console.error(JSON.stringify({ level: "error", msg, ...obj })),
-};
+import { logger } from "./logger.js";
 
 export const createWorker = (options?: { connection: RedisOptions }) => {
   // Validate env lazily or assume it's valid if connection is provided
@@ -78,39 +71,35 @@ if (require.main === module) {
   async function main() {
     const env = validateEnv();
 
-    console.log(`
-  ╔════════════════════════════════════════════╗
-  ║  🔧 ${APP_NAME.toUpperCase()} WORKER STARTING...      ║
-  ╚════════════════════════════════════════════╝
-    `);
+    logger.info(
+      {
+        service: APP_NAME,
+        redis: `${env.REDIS_HOST}:${env.REDIS_PORT}`,
+        queue: QUEUE_NAMES.WEBHOOK_DELIVERY,
+      },
+      "Worker starting..."
+    );
 
     const worker = createWorker();
     const prisma = createPrismaClient();
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
-      console.log(`\n📴 Received ${signal}, shutting down gracefully...`);
+      logger.info({ signal }, "Received signal, shutting down gracefully...");
       await worker.close();
       await prisma.$disconnect();
-      console.log("👋 Worker stopped");
+      logger.info({}, "Worker stopped");
       process.exit(0);
     };
 
     process.on("SIGTERM", () => shutdown("SIGTERM"));
     process.on("SIGINT", () => shutdown("SIGINT"));
 
-    console.log(`
-  ╔════════════════════════════════════════════╗
-  ║  ✅ ${APP_NAME.toUpperCase()} WORKER READY            ║
-  ║  📡 Redis: ${env.REDIS_HOST}:${env.REDIS_PORT}                    ║
-  ║  📋 Queue: ${QUEUE_NAMES.WEBHOOK_DELIVERY}           ║
-  ║  ⏳ Processing jobs...                     ║
-  ╚════════════════════════════════════════════╝
-    `);
+    logger.info({}, "Worker ready and processing jobs");
   }
 
   main().catch((err) => {
-    console.error("❌ Worker failed to start:", err);
+    logger.fatal({ err }, "Worker failed to start");
     process.exit(1);
   });
 }

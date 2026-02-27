@@ -6,7 +6,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import {
   createWebhookDeliveryQueue,
-  enqueueWebhookDelivery,
   type Queue,
   type WebhookDeliveryJobData,
   QUEUE_NAMES,
@@ -22,7 +21,7 @@ process.env.DATABASE_URL =
 process.env.REDIS_HOST = "localhost";
 process.env.REDIS_PORT = "6379";
 
-import { logger } from "../index.js";
+import { logger } from "../logger.js";
 import { processWebhookDelivery } from "../processor.js";
 
 describe("Worker Integration", () => {
@@ -89,7 +88,7 @@ describe("Worker Integration", () => {
         id: endpointId,
         projectId,
         name: "Test Endpoint",
-        url: targetUrl,
+        url: `https://example.com/webhook/${randomUUID()}`, // Make URL unique to avoid unique constraint violation
       },
     });
 
@@ -106,24 +105,36 @@ describe("Worker Integration", () => {
     });
 
     // Mock the external webhook target
+    // Note: nock matches the path, so even with unique URL we can match based on domain + path
+    // But since we are randomizing the path in the DB, we need to match that specific path or use regex
+    // const path = new URL(targetUrl).pathname;
+
+    // We used a fixed targetUrl in the job data, so nock should match that.
+    // The DB URL is just for the record. The job data has the actual URL to call.
+    // Wait, the job data usually comes from the event/endpoint, but in this test we construct it manually.
+    // The processor uses job.data.url.
+    // So we can put whatever we want in the DB as long as it satisfies constraints.
+
     const scope = nock("https://example.com")
       .post("/webhook")
       .reply(200, { success: true });
 
     // Start the worker manually to control connection and processor
-    worker = new Worker<WebhookDeliveryJobData>(
-      QUEUE_NAMES.WEBHOOK_DELIVERY,
-      async (job) => {
-        await processWebhookDelivery(job, { logger, prisma });
-      },
-      {
-        connection: {
-          host: process.env.REDIS_HOST,
-          port: parseInt(process.env.REDIS_PORT ?? "6379"),
-          maxRetriesPerRequest: null,
+    if (!worker) {
+      worker = new Worker<WebhookDeliveryJobData>(
+        QUEUE_NAMES.WEBHOOK_DELIVERY,
+        async (job) => {
+          await processWebhookDelivery(job, { logger, prisma });
         },
-      }
-    );
+        {
+          connection: {
+            host: process.env.REDIS_HOST,
+            port: parseInt(process.env.REDIS_PORT ?? "6379"),
+            maxRetriesPerRequest: null,
+          },
+        }
+      );
+    }
 
     // Enqueue job
     const jobData: WebhookDeliveryJobData = {
@@ -137,7 +148,7 @@ describe("Worker Integration", () => {
       attempt: 1,
     };
 
-    await enqueueWebhookDelivery(queue, jobData);
+    await queue.add("test-job", jobData);
 
     // Wait for job to complete
     await new Promise<void>((resolve) => {
@@ -181,7 +192,7 @@ describe("Worker Integration", () => {
         id: endpointId,
         projectId,
         name: "Test Endpoint 2",
-        url: targetUrl,
+        url: `https://example.com/fail/${randomUUID()}`, // Make URL unique
       },
     });
 
@@ -202,24 +213,6 @@ describe("Worker Integration", () => {
       .post("/fail")
       .reply(500, { error: "Internal Server Error" });
 
-    // Use existing worker or create if not exists (in this test structure, worker is recreated per suite but shared)
-    // Actually we should reuse or recreate. Let's reuse if it's running.
-    if (!worker) {
-      worker = new Worker<WebhookDeliveryJobData>(
-        QUEUE_NAMES.WEBHOOK_DELIVERY,
-        async (job) => {
-          await processWebhookDelivery(job, { logger, prisma });
-        },
-        {
-          connection: {
-            host: process.env.REDIS_HOST,
-            port: parseInt(process.env.REDIS_PORT ?? "6379"),
-            maxRetriesPerRequest: null,
-          },
-        }
-      );
-    }
-
     // Enqueue job
     const jobData: WebhookDeliveryJobData = {
       eventId,
@@ -232,13 +225,12 @@ describe("Worker Integration", () => {
       attempt: 1,
     };
 
-    await enqueueWebhookDelivery(queue, jobData);
+    await queue.add("test-job-fail", jobData);
 
     await new Promise<void>((resolve) => {
-      worker.on("completed", (job) => {
-        if (job.data.eventId === eventId) resolve();
-      });
-      // Also listen for failed just in case the processor throws instead of capturing
+      // The worker will fail the job because the processor throws on non-2xx
+      // But we also catch "completed" if we changed logic to not throw.
+      // Current processor logic throws on failure to trigger BullMQ retry.
       worker.on("failed", (job) => {
         if (job?.data.eventId === eventId) resolve();
       });
