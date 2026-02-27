@@ -34,39 +34,10 @@ echo "  ./plans/ralph.sh 20    (run 20 autonomous iterations)"
 echo ""
 echo "================================================================================"
 echo ""
-echo "Choose execution mode:"
-echo "  1) Direct execution (OpenCode runs on host)"
-echo "  2) Docker sandbox (OpenCode runs in isolated container) [RECOMMENDED]"
+echo "Running initialization with OpenCode..."
 echo ""
-read -p "Enter choice [1-2]: " choice
 
-case $choice in
-  1)
-    echo ""
-    echo "Running initialization with OpenCode on host..."
-    echo ""
-    opencode -p "$(cat "$INIT_PROMPT")"
-    ;;
-  2)
-    echo ""
-    echo "Running initialization in Docker sandbox..."
-    echo ""
-    # Check if docker is available
-    if ! command -v docker &> /dev/null; then
-      echo "ERROR: Docker not found. Please install Docker Desktop:" >&2
-      echo "  https://docs.docker.com/desktop/install" >&2
-      exit 1
-    fi
-    
-    # Run OpenCode in Docker sandbox
-    # The sandbox is automatically created and destroyed
-    docker sandbox run opencode "$SCRIPT_DIR/.." -- -p "$(cat "$INIT_PROMPT")"
-    ;;
-  *)
-    echo "Invalid choice. Exiting." >&2
-    exit 1
-    ;;
-esac
+opencode -p "$(cat "$INIT_PROMPT")"
 
 echo ""
 echo "================================================================================"

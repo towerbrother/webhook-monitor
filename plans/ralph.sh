@@ -17,12 +17,9 @@ LOG_FILE="$LOG_DIR/ralph-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOG_DIR"
 
 # Validate arguments
-USE_SANDBOX="${2:-false}"
-
 if [ -z "${1:-}" ]; then
-  echo "Usage: $0 <iterations> [sandbox]" >&2
+  echo "Usage: $0 <iterations>" >&2
   echo "Example: $0 20" >&2
-  echo "         $0 20 sandbox    # Run in Docker sandbox" >&2
   exit 1
 fi
 
@@ -71,15 +68,7 @@ for ((i=1; i<=MAX_ITERATIONS; i++)); do
   # This prevents context window exhaustion and ensures consistent performance
   
   set +e  # Temporarily disable exit-on-error to capture failures
-  
-  if [ "$USE_SANDBOX" = "sandbox" ]; then
-    # Run in Docker sandbox
-    result=$(docker sandbox run opencode "$PROJECT_ROOT" -- -p "$(cat "$PROMPT_FILE")" 2>&1)
-  else
-    # Run directly on host
-    result=$(opencode -p "$(cat "$PROMPT_FILE")" 2>&1)
-  fi
-  
+  result=$(opencode -p "$(cat "$PROMPT_FILE")" 2>&1)
   exit_code=$?
   set -e
   
