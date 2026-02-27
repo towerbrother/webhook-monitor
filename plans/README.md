@@ -22,6 +22,8 @@ It explains everything step-by-step, like you're 5 years old! 🎨
 ./plans/ralph-init.sh
 ```
 
+Choose option `2` (Docker sandbox - recommended for safety).
+
 This will:
 
 - Create `ralph/autonomous` branch (long-running development branch)
@@ -40,8 +42,14 @@ After initialization, start the Ralph loop:
 # Human-in-the-loop (one iteration, watch what happens)
 ./plans/ralph-once.sh
 
-# Fully autonomous (20 iterations max)
+# Fully autonomous (20 iterations max, direct execution)
 ./plans/ralph.sh 20
+
+# Fully autonomous (20 iterations in Docker sandbox - recommended)
+./plans/ralph.sh 20 sandbox
+
+# Fully autonomous (run until complete in sandbox)
+./plans/ralph.sh 999 sandbox
 ```
 
 Ralph will:
@@ -189,13 +197,47 @@ Only after ALL checks pass can the feature be marked `passes: true` in the PRD.
 
 See [`../docs/sandbox-spec.md`](../docs/sandbox-spec.md) for full security details.
 
-OpenCode runs directly on your system with the following safety considerations:
+### Docker Sandbox (Recommended)
 
-- File operations limited to workspace directory
-- Network access for npm/pnpm registries and GitHub
-- Process runs with your user permissions
+Ralph supports running in Docker sandboxes for isolation:
 
-**Note:** Docker sandbox isolation is only available for Claude Code and Gemini, not OpenCode. OpenCode runs directly on the host system.
+```bash
+# Run initialization in sandbox
+./plans/ralph-init.sh
+# Choose option 2
+
+# Run single iteration in sandbox
+./plans/ralph-once.sh
+# Choose option 2
+
+# Run autonomous loop in sandbox
+./plans/ralph.sh 20 sandbox
+```
+
+**Benefits:**
+
+- File access limited to workspace directory
+- Network isolation
+- Process isolation
+- Can't affect host system
+
+**How it works:**
+
+- Uses `docker sandbox run opencode <workspace>`
+- Automatically creates and manages sandbox
+- Workspace mounted at same path inside container
+- Git operations work seamlessly
+
+### Direct Execution
+
+If you prefer to run without Docker:
+
+```bash
+# Choose option 1 during interactive scripts
+# Or omit 'sandbox' parameter: ./plans/ralph.sh 20
+```
+
+OpenCode runs with your user permissions and has access to your file system.
 
 ---
 
