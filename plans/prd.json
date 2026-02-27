@@ -3,7 +3,7 @@
   "meta": {
     "project": "webhook-monitor",
     "description": "Product Requirements Document for webhook-monitor implementation. Each feature is a discrete, verifiable unit of work.",
-    "totalFeatures": 37,
+    "totalFeatures": 38,
     "methodology": "Ralph Wiggum Technique — bash loop + structured plan + one-task-per-iteration",
     "references": [
       "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents",
@@ -16,14 +16,15 @@
       "id": "idempotency-key-extraction",
       "category": "functional",
       "dependencies": [],
-      "description": "Extract X-Idempotency-Key header from ingest request and pass to Event.create. Catch Prisma P2002 unique constraint violation and return 409 Conflict with original eventId. Truncate key to 255 chars.",
+      "description": "Extract X-Idempotency-Key header from ingest request and validate max 255 chars. Return 400 if oversized (do not truncate). Pass to Event.create. Catch Prisma P2002 unique constraint violation and return 409 Conflict with original eventId.",
       "steps": [
         "Read apps/api/src/routes/webhooks.ts to understand current ingest route",
-        "Read X-Idempotency-Key header (take first value if array, truncate to 255 chars)",
+        "Read X-Idempotency-Key header (take first value if array)",
+        "Validate idempotency key length <= 255 chars using Zod, return 400 if oversized (do NOT truncate)",
         "Pass idempotencyKey to prisma event.create (omit if header absent to preserve NULL behavior)",
         "Wrap event.create in try/catch for PrismaClientKnownRequestError code P2002",
         "On P2002: query existing event by (projectId, idempotencyKey) and return 409 with { success: true, eventId, receivedAt, duplicate: true }",
-        "Add/update tests: duplicate key same project -> 409; duplicate key different project -> 201; no key -> 201",
+        "Add/update tests: duplicate key same project -> 409; duplicate key different project -> 201; no key -> 201; 256-char key -> 400",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
@@ -31,7 +32,8 @@
         "POST with X-Idempotency-Key: abc -> 201, event has idempotencyKey='abc'",
         "Same request again -> 409, returns same eventId",
         "Same key, different project -> 201, new event",
-        "No header -> 201, event.idempotencyKey is null"
+        "No header -> 201, event.idempotencyKey is null",
+        "256-character key -> 400 Bad Request"
       ],
       "passes": true
     },
@@ -39,18 +41,19 @@
       "id": "zod-validation",
       "category": "functional",
       "dependencies": [],
-      "description": "Add Zod schemas for endpointId path param validation (non-empty string) and optional body shape. Validate idempotency key max length 255 via Zod. Return 400 on validation failures.",
+      "description": "Add Zod schemas for endpointId path param validation (alphanumeric + underscore/dash only) and optional body shape. Validate idempotency key max length 255 via Zod. Return 400 on validation failures.",
       "steps": [
         "Import Zod into routes/webhooks.ts",
-        "Define EndpointParamsSchema validating endpointId as non-empty string",
+        "Define EndpointParamsSchema validating endpointId as non-empty string matching /^[a-zA-Z0-9_-]+$/",
         "Define IdempotencyKeySchema: optional string, max length 255",
         "Apply validation at route entry, return 400 with Zod error details on failure",
-        "Add tests: empty endpointId -> 400; oversized idempotency key (>255 chars) -> 400",
+        "Add tests: empty endpointId -> 400; endpointId with SQL injection chars -> 400; oversized idempotency key (>255 chars) -> 400",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
         "Invalid endpointId (empty string) -> 400",
+        "endpointId with special chars '; DROP TABLE --' -> 400",
         "Oversized idempotency key (>255 chars) -> 400",
         "Valid params -> 201 (no regression)"
       ],
@@ -78,14 +81,16 @@
       "id": "pino-logger-worker",
       "category": "operational",
       "dependencies": [],
-      "description": "Replace ad-hoc console.log logger in worker with Pino instance. Add LOG_LEVEL env var. Configure pino-pretty for dev. Ensure structured JSON output in production.",
+      "description": "Replace ad-hoc console.log logger in worker with Pino instance. Add LOG_LEVEL env var. Configure pino-pretty for dev. Ensure structured JSON output in production. NEVER log endpoint objects (may contain signingSecret).",
       "steps": [
         "Add pino and pino-pretty deps to apps/worker/package.json",
         "Add LOG_LEVEL env var (default 'info') to apps/worker/src/env.ts",
         "Create apps/worker/src/logger.ts with createLogger factory using Pino",
+        "Configure Pino redact paths to never log sensitive fields: redact: ['*.signingSecret', 'endpoint.signingSecret']",
         "Replace all console.log/console.error in index.ts and processor.ts with Pino logger calls",
         "Include { service: 'worker' } base context in all log lines",
         "Verify no console.log calls remain in worker source (grep to confirm)",
+        "Verify logger.info({ endpoint }) redacts signingSecret field (add test)",
         "Update processor tests to work with new logger interface",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
@@ -93,6 +98,7 @@
       "gatewayTests": [
         "Worker startup log emitted at info level as valid JSON (non-pretty mode)",
         "LOG_LEVEL=warn suppresses info logs",
+        "Logging endpoint object redacts signingSecret field",
         "All existing processor tests pass with new logger"
       ],
       "passes": false
@@ -122,20 +128,22 @@
       "id": "event-list-endpoint",
       "category": "functional",
       "dependencies": [],
-      "description": "Add GET /webhooks/:endpointId/events endpoint. Returns paginated event list with status, idempotencyKey, receivedAt. Tenant-scoped via projectId.",
+      "description": "Add GET /webhooks/:endpointId/events endpoint. Returns paginated event list with status, idempotencyKey, receivedAt. Tenant-scoped via projectId. Enforce max page size 100, default 50.",
       "steps": [
         "Add GET /webhooks/:endpointId/events handler in routes/webhooks.ts",
-        "Implement cursor-based or page+limit pagination",
+        "Implement cursor-based or page+limit pagination with MAX_PAGE_SIZE=100, default limit=50",
+        "Validate limit param: if >100 return 400 'Page size exceeds maximum of 100'",
         "Validate endpointId param with Zod",
-        "Scope query by projectId for multi-tenancy",
+        "Scope query by projectId for multi-tenancy (filter WHERE projectId = req.project.id)",
         "Return events with id, status, idempotencyKey, receivedAt, headers (exclude body for list view)",
-        "Add integration tests: list events for endpoint; empty endpoint -> empty array; cross-tenant -> 404",
+        "Add integration tests: list events for endpoint; empty endpoint -> empty array; cross-tenant -> 404; limit=101 -> 400",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
         "GET events for endpoint with 3 events -> returns 3 items with correct fields",
         "Pagination works (limit=1 returns 1 item with cursor/next info)",
+        "limit=101 -> 400 with 'exceeds maximum' error",
         "Cross-tenant endpoint -> 404"
       ],
       "passes": false
@@ -144,15 +152,17 @@
       "id": "replay-endpoint",
       "category": "functional",
       "dependencies": ["event-list-endpoint"],
-      "description": "Add POST /webhooks/:endpointId/events/:eventId/replay endpoint. Re-enqueues FAILED events. Guards against replaying DELIVERED, PENDING, or RETRYING events.",
+      "description": "Add POST /webhooks/:endpointId/events/:eventId/replay endpoint with rate limiting (10 replays/min per project). Re-enqueues FAILED events. Guards against replaying DELIVERED, PENDING, or RETRYING events. Logs replay action with correlationId.",
       "steps": [
         "Add POST /webhooks/:endpointId/events/:eventId/replay handler",
+        "Apply rate limit: 10 replays per minute per projectId (use in-memory or Redis counter)",
         "Validate endpointId and eventId params with Zod",
         "Lookup Event by (id, projectId) and verify endpointId matches",
         "Guard: DELIVERED -> 200 { queued: false, message: 'Already delivered' }",
         "Guard: PENDING or RETRYING -> 200 { queued: false, message: 'Already in progress' }",
+        "On FAILED: log replay action with { eventId, projectId, correlationId, action: 'replay' }",
         "On FAILED: update Event.status = PENDING, enqueue job, return 202 { queued: true, eventId }",
-        "Add integration tests: replay FAILED -> 202; replay DELIVERED -> 200 no-op; unknown eventId -> 404; cross-tenant -> 404",
+        "Add integration tests: replay FAILED -> 202; replay DELIVERED -> 200 no-op; unknown eventId -> 404; cross-tenant -> 404; 11th replay in 1 min -> 429",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
@@ -160,7 +170,8 @@
         "POST replay on FAILED event -> 202, Event.status = PENDING, job in queue",
         "POST replay on DELIVERED event -> 200, { queued: false }",
         "POST replay on nonexistent event -> 404",
-        "Cross-project event -> 404"
+        "Cross-project event -> 404",
+        "11th replay within 1 minute -> 429 Too Many Requests"
       ],
       "passes": false
     },
@@ -168,22 +179,28 @@
       "id": "rate-limiting",
       "category": "security",
       "dependencies": [],
-      "description": "Register @fastify/rate-limit with Redis store, keyed by projectId. Default 100 req/60s per project. Exclude /health and /metrics from rate limiting. Fail open on Redis failure.",
+      "description": "Register @fastify/rate-limit with Redis store, keyed by projectId (after auth). Default 100 req/60s per project. Unauthenticated routes: 10 req/60s per IP. Exclude /health and /metrics. Fail-closed by default (503 on Redis error), with RATE_LIMIT_FAIL_OPEN env opt-in.",
       "steps": [
         "Add @fastify/rate-limit to apps/api/package.json",
-        "Add RATE_LIMIT_MAX (default 100) and RATE_LIMIT_WINDOW_MS (default 60000) to apps/api/src/env.ts",
-        "Register plugin in buildApp with keyGenerator: (req) => req.project?.id ?? req.ip",
+        "Add RATE_LIMIT_MAX (default 100), RATE_LIMIT_WINDOW_MS (default 60000), RATE_LIMIT_FAIL_OPEN (default false) to apps/api/src/env.ts",
+        "Register plugin in buildApp AFTER authentication middleware",
+        "Configure keyGenerator: (req) => req.project?.id ?? `unauthenticated:${req.ip}`",
+        "Configure max for authenticated: 100; for unauthenticated: 10 (stricter)",
         "Configure Redis store for cross-replica consistency",
         "Exclude /health and /metrics routes from rate limiting",
-        "Configure fail-open behavior: on Redis error, log warning and allow request",
-        "Add tests: 101st request same project -> 429 with Retry-After; different project -> 200; /health not limited",
+        "Configure fail-closed: on Redis error, return 503 (unless RATE_LIMIT_FAIL_OPEN=true)",
+        "If RATE_LIMIT_FAIL_OPEN=true: use in-memory fallback with reduced limit (10 req/min)",
+        "Add tests: 101st request same project -> 429; different project -> 200; Redis down + fail-closed -> 503; Redis down + fail-open -> 200 with reduced limit; /health not limited",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
-        "101st request from same project within window -> 429 with Retry-After header",
+        "101st authenticated request from same project within window -> 429 with Retry-After header",
         "101st request from different project -> 200",
-        "/health -> 200, not rate-limited"
+        "11th unauthenticated request from same IP -> 429",
+        "/health -> 200, not rate-limited",
+        "Redis unavailable + RATE_LIMIT_FAIL_OPEN=false -> 503",
+        "Redis unavailable + RATE_LIMIT_FAIL_OPEN=true -> 200 (fallback to in-memory limit)"
       ],
       "passes": false
     },
@@ -191,19 +208,25 @@
       "id": "signing-secret-migration",
       "category": "security",
       "dependencies": [],
-      "description": "Add optional signingSecret field to WebhookEndpoint schema. Run migration. signingSecret must never appear in API responses or logs.",
+      "description": "Add optional signingSecret field to WebhookEndpoint schema with @sensitive annotation. Run migration. Verify signingSecret NEVER appears in API responses, logs, or error messages. Create explicit DTO excluding signingSecret.",
       "steps": [
-        "Add signingSecret String? to WebhookEndpoint in packages/db/prisma/schema.prisma",
+        "Add signingSecret String? @db.Text to WebhookEndpoint in packages/db/prisma/schema.prisma with comment '/// @sensitive - never expose in API responses or logs'",
         "Run pnpm --filter @repo/db migrate dev --name add_signing_secret",
-        "Verify migration applies cleanly (non-destructive, adds column only)",
-        "Ensure existing endpoint queries never select signingSecret for API responses",
+        "Read generated migration SQL file, verify it only adds column (no DROP, no ALTER with data loss)",
+        "Document rollback command in migration: 'ALTER TABLE WebhookEndpoint DROP COLUMN signingSecret'",
+        "Create packages/shared/src/dto.ts with WebhookEndpointDTO type that explicitly excludes signingSecret",
+        "Update all endpoint API responses to use Prisma select without signingSecret: select: { id: true, url: true, projectId: true, createdAt: true }",
+        "Add automated test: GET /webhooks/:id response body must NOT contain signingSecret field (even if null)",
+        "Add test: grep codebase for 'console.log.*endpoint' or 'logger.*endpoint' without redact -> must not exist",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
-        "Migration applies without error",
+        "Migration applies without error (idempotent)",
         "Existing endpoints have signingSecret = null",
-        "No regression in existing tests"
+        "GET /webhooks/:id response does NOT contain signingSecret field",
+        "No regression in existing tests",
+        "Logging endpoint object does NOT expose signingSecret (redacted by Pino)"
       ],
       "passes": false
     },
@@ -211,23 +234,27 @@
       "id": "hmac-verification",
       "category": "security",
       "dependencies": ["signing-secret-migration"],
-      "description": "Implement HMAC-SHA256 signature verification in ingest route. Add verifyWebhookSignature helper using crypto.timingSafeEqual. Configure Fastify raw body preservation.",
+      "description": "Implement HMAC-SHA256 signature verification in ingest route. Add verifyWebhookSignature helper using crypto.timingSafeEqual. Configure Fastify raw body preservation with 1MB size limit. Return 413 if body exceeds limit.",
       "steps": [
-        "Add verifyWebhookSignature(rawBody, signatureHeader, secret) to @repo/shared using crypto.timingSafeEqual",
-        "Configure Fastify to preserve raw body (addContentTypeParser or rawBody plugin)",
+        "Configure Fastify to preserve raw body with size limit: bodyLimit: 1048576 (1MB)",
+        "Add request size limit handler: return 413 Payload Too Large if body exceeds 1MB",
+        "Add verifyWebhookSignature(rawBody: Buffer, signatureHeader: string, secret: string): boolean to @repo/shared",
+        "Implementation: compute HMAC-SHA256 of rawBody using secret, compare with signatureHeader using crypto.timingSafeEqual",
+        "Ensure both buffers same length before timingSafeEqual (pad or reject if mismatch)",
         "In POST /webhooks/:endpointId: if endpoint.signingSecret exists, read x-hub-signature-256 header",
-        "Call verifyWebhookSignature, return 401 on failure (before event creation)",
-        "Unit test verifyWebhookSignature: valid -> true; tampered body -> false; wrong secret -> false",
-        "Integration tests: signed correct -> 201; wrong secret -> 401; no header with secret set -> 401; no secret on endpoint -> 201",
+        "Call verifyWebhookSignature, return 401 Unauthorized on failure (before event creation)",
+        "Unit test verifyWebhookSignature: valid -> true; tampered body -> false; wrong secret -> false; signature 1 bit flipped -> false",
+        "Integration tests: signed correct -> 201; wrong secret -> 401; no header with secret set -> 401; no secret on endpoint -> 201; 2MB body -> 413",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
         "Valid HMAC-SHA256 signature -> 201",
-        "Tampered body -> 401",
+        "Tampered body (1 bit changed) -> 401",
         "Wrong secret -> 401",
         "No signature header, endpoint has secret -> 401",
-        "No signature header, endpoint has no secret -> 201"
+        "No signature header, endpoint has no secret -> 201",
+        "2MB request body -> 413 Payload Too Large"
       ],
       "passes": false
     },
@@ -235,22 +262,27 @@
       "id": "prometheus-metrics",
       "category": "operational",
       "dependencies": [],
-      "description": "Add Prometheus-compatible metrics using prom-client. Instrument: events_received_total, delivery_attempts_total, delivery_duration_ms, queue_depth, events_status_total. Expose /metrics on API and internal port on worker.",
+      "description": "Add Prometheus-compatible metrics using prom-client. Instrument: events_received_total, delivery_attempts_total, delivery_duration_ms, queue_depth, events_status_total. Expose /metrics on API with optional Bearer token auth. Worker exposes on internal port (default 9091).",
       "steps": [
         "Add prom-client to apps/api/package.json and apps/worker/package.json",
+        "Add METRICS_AUTH_TOKEN env var (optional) to apps/api/src/env.ts",
         "Create packages/shared/src/metrics.ts with metric definitions and shared registry",
-        "Register GET /metrics in buildApp before other routes; exclude from auth + rate limiting",
+        "Register GET /metrics in buildApp before other routes; exclude from project auth + rate limiting",
+        "If METRICS_AUTH_TOKEN is set: require Authorization: Bearer <token> header, return 401 if missing/wrong",
+        "If METRICS_AUTH_TOKEN not set: document in README that /metrics should be firewalled",
         "Increment webhook_events_received_total in ingest route on 201",
         "Record webhook_delivery_duration_ms and webhook_delivery_attempts_total in processor",
         "Add minimal HTTP server in worker on METRICS_PORT (env-configurable, default 9091) serving GET /metrics",
-        "Add test: GET /metrics returns 200 with Content-Type text/plain",
+        "Add tests: GET /metrics with valid token -> 200; wrong token -> 401; no token required if env unset -> 200; Content-Type text/plain",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
         "After one ingest, webhook_events_received_total count = 1",
         "After one delivery, webhook_delivery_attempts_total incremented",
-        "GET /metrics returns valid Prometheus text format"
+        "GET /metrics returns valid Prometheus text format",
+        "GET /metrics with METRICS_AUTH_TOKEN set + wrong token -> 401",
+        "GET /metrics with METRICS_AUTH_TOKEN set + correct token -> 200"
       ],
       "passes": false
     },
@@ -258,20 +290,24 @@
       "id": "dockerfiles",
       "category": "infrastructure",
       "dependencies": [],
-      "description": "Create production-ready multi-stage Dockerfiles for api, worker, and web apps. Node 24 Alpine base. Prisma client pre-generated. Run as non-root. Add .dockerignore.",
+      "description": "Create production-ready multi-stage Dockerfiles for api, worker, and web apps. Node 24 Alpine base. Prisma client pre-generated. Run as non-root. Add .dockerignore. Verify no secrets baked into images using automated check.",
       "steps": [
         "Create apps/api/Dockerfile: multi-stage (builder installs deps + generates Prisma + builds; runtime copies artifacts only)",
         "API entrypoint runs prisma migrate deploy before starting Node",
         "Create apps/worker/Dockerfile: same multi-stage pattern, no HTTP",
         "Create apps/web/Dockerfile: set output standalone in next.config.ts, copy .next/standalone",
-        "Add .dockerignore at monorepo root: exclude .git, node_modules, .next, dist, test files",
+        "Add .dockerignore at monorepo root: exclude .git, node_modules, .next, dist, test files, .env, .env.*, *.log",
         "Verify docker build succeeds for all three apps",
+        "Add automated check: docker history <image> | grep -iE 'password|secret|DATABASE_URL|api.?key' -> must be empty",
+        "Add test: inspect final image filesystem (docker run --rm <image> ls -la), assert no .env files present",
+        "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
         "docker build succeeds for all three apps without errors",
         "Images run as non-root (USER node)",
-        "No .env files or secrets baked into images"
+        "docker history <image> contains no environment variables with secrets",
+        "No .env files present in final image filesystem"
       ],
       "passes": false
     },
@@ -292,7 +328,7 @@
       "gatewayTests": [
         "docker-compose up brings all services to healthy state",
         "curl http://localhost:3001/health -> { status: ok }",
-        "API container with missing env var -> exits non-zero"
+        "API container with missing DATABASE_URL -> exits non-zero"
       ],
       "passes": false
     },
@@ -300,17 +336,22 @@
       "id": "load-test",
       "category": "validation",
       "dependencies": ["docker-compose"],
-      "description": "Create k6 load test script: ramp to 100 VU, sustain 5 min, assert p95 < 200ms and error rate < 1%. Run against docker-compose stack.",
+      "description": "Create k6 load test script: ramp to 100 VU, sustain 5 min, assert p95 < 200ms and error rate < 1%. Monitor memory and CPU usage. Add 1-hour sustained load test to catch memory leaks.",
       "steps": [
         "Create scripts/load-test.js (k6 script) with ramp-up and sustained load phases",
-        "Configure thresholds: p95 < 200ms, error rate < 1%",
-        "Document how to run: k6 run scripts/load-test.js",
+        "Configure thresholds: p95 < 200ms, error rate < 1%, memory < 1GB per service, CPU < 80%",
+        "Create scripts/load-test-sustained.js: 1 hour continuous load at 50 VU",
+        "Add memory leak detection: sample memory usage every 5 minutes, assert < 10% growth over 1 hour",
+        "Document how to run: k6 run scripts/load-test.js and k6 run scripts/load-test-sustained.js",
         "Run load test against docker-compose stack and verify thresholds pass",
+        "Run sustained load test and verify no memory leaks",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
         "p95 ingest latency < 200ms under load",
-        "Error rate < 1% under sustained load"
+        "Error rate < 1% under sustained load",
+        "Memory usage stable over 1 hour (< 10% growth)",
+        "CPU usage < 80% under sustained load"
       ],
       "passes": false
     },
@@ -318,19 +359,25 @@
       "id": "chaos-tests",
       "category": "validation",
       "dependencies": ["docker-compose"],
-      "description": "Create chaos test scripts: Redis disconnect mid-delivery, PostgreSQL disconnect mid-write, worker crash mid-job. Verify graceful degradation and recovery.",
+      "description": "Create chaos test scripts with data integrity verification: Redis disconnect mid-delivery, PostgreSQL disconnect mid-write, worker crash mid-job. Verify ALL events accounted for (no data loss) and graceful recovery.",
       "steps": [
+        "Before chaos tests: insert 100 known test events with unique IDs, record count",
         "Create scripts/chaos-redis.sh: start load, stop Redis, verify graceful degradation, restart, verify recovery",
         "Create scripts/chaos-db.sh: stop Postgres, verify API returns 503 (not 500), restart, verify recovery",
-        "Assert delivery queue backlog drains within SLA after outage recovery",
+        "Create scripts/chaos-worker.sh: kill worker process mid-job, restart, verify job continues",
+        "After each chaos test: query Event table count, assert equals sent count (no events lost)",
+        "After recovery: assert ALL events have status DELIVERED or FAILED (none stuck in PENDING)",
+        "Verify delivery queue backlog drains within SLA after outage recovery",
+        "Check DeliveryAttempt integrity: every DELIVERED event has at least one successful attempt",
         "Document findings and SLA thresholds in docs/infrastructure.md",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
-        "All events eventually delivered after Redis/Postgres restart",
+        "All 100 test events accounted for after Redis restart (no data loss)",
+        "All events either DELIVERED or FAILED after recovery (none stuck)",
         "Worker gracefully reconnects after Redis restart",
         "Ingest returns 503 (not 500) when DB is down",
-        "No data loss under any tested failure scenario"
+        "Every DELIVERED event has corresponding successful DeliveryAttempt"
       ],
       "passes": false
     },
@@ -456,6 +503,43 @@
         "Status breakdown shows correct counts per status",
         "Recent failures list shows FAILED events with replay action",
         "Playwright test: dashboard loads, summary cards and failure list visible"
+      ],
+      "passes": false
+    },
+    {
+      "id": "security-audit",
+      "category": "security",
+      "dependencies": [
+        "hmac-verification",
+        "rate-limiting",
+        "signing-secret-migration",
+        "pino-logger-worker",
+        "prometheus-metrics"
+      ],
+      "description": "Run comprehensive security audit: verify no secrets in logs/responses/images, test cross-tenant isolation on all endpoints, verify all oversized payloads rejected, check HMAC timing safety, validate rate limiting effectiveness.",
+      "steps": [
+        "Grep entire codebase for dangerous patterns: 'console.log.*endpoint', 'logger.info.*endpoint' without redact -> must not exist or use redacted logger",
+        "Test cross-tenant isolation: for EVERY endpoint with projectId parameter, call with different project's X-Project-Key -> must return 404 (not 200 with wrong data)",
+        "Endpoints to test: GET /webhooks/:endpointId/events, POST /webhooks/:endpointId/events/:eventId/replay, GET /webhooks/:endpointId (if exists)",
+        "Test all string inputs with SQL injection payloads: '; DROP TABLE events--', '1' OR '1'='1', etc. -> all must return 400 (caught by Zod)",
+        "Test all endpoints with oversized payloads: 2MB body -> 413; 256-char idempotency key -> 400; limit=1000 -> 400",
+        "Test Docker images for secrets: run 'docker history api:latest | grep -iE \"password|secret|DATABASE_URL\"' -> must be empty",
+        "Test HMAC timing safety: measure response times for 10,000 requests with invalid signatures, assert standard deviation < 5ms (no timing leak)",
+        "Test rate limiting: send 101 requests in 60 seconds -> 101st must be 429; verify Retry-After header present",
+        "Verify Prometheus /metrics endpoint: if METRICS_AUTH_TOKEN set, test with wrong token -> 401; no token -> 401",
+        "Document all findings in docs/security-audit.md with pass/fail for each check",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "No console.log or unredacted logger calls with endpoint objects in codebase",
+        "All cross-tenant API calls return 404 (tested: events list, replay, endpoint detail)",
+        "All SQL injection attempts caught by validation (return 400)",
+        "All oversized payloads rejected (2MB body -> 413, 256-char idempotency -> 400, limit=1000 -> 400)",
+        "Docker images contain no secrets (docker history check passes)",
+        "HMAC verification has no timing leak (std dev < 5ms)",
+        "Rate limiting works (101st request -> 429 with Retry-After)",
+        "Prometheus /metrics properly protected (wrong token -> 401)"
       ],
       "passes": false
     }
