@@ -9,7 +9,10 @@
     "check-types": "turbo check-types",
     "db:setup": "docker compose up -d && pnpm --filter @repo/db db:setup",
     "test": "turbo test",
-    "test:coverage": "turbo test -- --coverage"
+    "test:coverage": "turbo test -- --coverage",
+    "ralph": "bash plans/ralph.sh",
+    "ralph:once": "bash plans/ralph-once.sh",
+    "ralph:init": "bash plans/ralph-init.sh"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.18",
