@@ -1,0 +1,463 @@
+{
+  "$schema": "ralph-plan-v1",
+  "meta": {
+    "project": "webhook-monitor",
+    "description": "Product Requirements Document for webhook-monitor implementation. Each feature is a discrete, verifiable unit of work.",
+    "totalFeatures": 37,
+    "methodology": "Ralph Wiggum Technique — bash loop + structured plan + one-task-per-iteration",
+    "references": [
+      "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents",
+      "https://ghuntley.com/ralph/",
+      "https://github.com/ghuntley/how-to-ralph-wiggum"
+    ]
+  },
+  "features": [
+    {
+      "id": "idempotency-key-extraction",
+      "category": "functional",
+      "dependencies": [],
+      "description": "Extract X-Idempotency-Key header from ingest request and pass to Event.create. Catch Prisma P2002 unique constraint violation and return 409 Conflict with original eventId. Truncate key to 255 chars.",
+      "steps": [
+        "Read apps/api/src/routes/webhooks.ts to understand current ingest route",
+        "Read X-Idempotency-Key header (take first value if array, truncate to 255 chars)",
+        "Pass idempotencyKey to prisma event.create (omit if header absent to preserve NULL behavior)",
+        "Wrap event.create in try/catch for PrismaClientKnownRequestError code P2002",
+        "On P2002: query existing event by (projectId, idempotencyKey) and return 409 with { success: true, eventId, receivedAt, duplicate: true }",
+        "Add/update tests: duplicate key same project -> 409; duplicate key different project -> 201; no key -> 201",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "POST with X-Idempotency-Key: abc -> 201, event has idempotencyKey='abc'",
+        "Same request again -> 409, returns same eventId",
+        "Same key, different project -> 201, new event",
+        "No header -> 201, event.idempotencyKey is null"
+      ],
+      "passes": true
+    },
+    {
+      "id": "zod-validation",
+      "category": "functional",
+      "dependencies": [],
+      "description": "Add Zod schemas for endpointId path param validation (non-empty string) and optional body shape. Validate idempotency key max length 255 via Zod. Return 400 on validation failures.",
+      "steps": [
+        "Import Zod into routes/webhooks.ts",
+        "Define EndpointParamsSchema validating endpointId as non-empty string",
+        "Define IdempotencyKeySchema: optional string, max length 255",
+        "Apply validation at route entry, return 400 with Zod error details on failure",
+        "Add tests: empty endpointId -> 400; oversized idempotency key (>255 chars) -> 400",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Invalid endpointId (empty string) -> 400",
+        "Oversized idempotency key (>255 chars) -> 400",
+        "Valid params -> 201 (no regression)"
+      ],
+      "passes": true
+    },
+    {
+      "id": "worker-integration-test",
+      "category": "testing",
+      "dependencies": [],
+      "description": "Add worker integration test: enqueue real job -> verify DeliveryAttempt created and Event.status = DELIVERED. This is the remaining unchecked item from Step 3.",
+      "steps": [
+        "Create integration test that enqueues a real BullMQ job with a mock HTTP target",
+        "Verify DeliveryAttempt record is created with correct fields",
+        "Verify Event.status transitions to DELIVERED",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Enqueued job against mock 200 server -> Event.status = DELIVERED, DeliveryAttempt.success = true",
+        "Enqueued job against mock 500 server -> Event.status = RETRYING, DeliveryAttempt.success = false"
+      ],
+      "passes": false
+    },
+    {
+      "id": "pino-logger-worker",
+      "category": "operational",
+      "dependencies": [],
+      "description": "Replace ad-hoc console.log logger in worker with Pino instance. Add LOG_LEVEL env var. Configure pino-pretty for dev. Ensure structured JSON output in production.",
+      "steps": [
+        "Add pino and pino-pretty deps to apps/worker/package.json",
+        "Add LOG_LEVEL env var (default 'info') to apps/worker/src/env.ts",
+        "Create apps/worker/src/logger.ts with createLogger factory using Pino",
+        "Replace all console.log/console.error in index.ts and processor.ts with Pino logger calls",
+        "Include { service: 'worker' } base context in all log lines",
+        "Verify no console.log calls remain in worker source (grep to confirm)",
+        "Update processor tests to work with new logger interface",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Worker startup log emitted at info level as valid JSON (non-pretty mode)",
+        "LOG_LEVEL=warn suppresses info logs",
+        "All existing processor tests pass with new logger"
+      ],
+      "passes": false
+    },
+    {
+      "id": "correlation-id",
+      "category": "functional",
+      "dependencies": ["pino-logger-worker"],
+      "description": "Add correlationId to WebhookDeliveryJobData. Pass Fastify request.id as correlationId when enqueuing. Log correlationId in all processor log calls. Default to job.id if correlationId is undefined (backward compat for old jobs).",
+      "steps": [
+        "Add correlationId: string to WebhookDeliveryJobData in packages/queue/src/index.ts",
+        "Update enqueueWebhookDelivery caller in webhooks.ts to pass request.id as correlationId",
+        "Update processor to extract correlationId from job data (fallback to job.id)",
+        "Include correlationId in every processor log call alongside eventId and projectId",
+        "Add LOG_LEVEL env var to apps/api/src/env.ts if not already present",
+        "Update tests to verify correlationId propagation",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Processor completion log includes correlationId matching value set at ingestion",
+        "Job without correlationId (old format) falls back to job.id"
+      ],
+      "passes": false
+    },
+    {
+      "id": "event-list-endpoint",
+      "category": "functional",
+      "dependencies": [],
+      "description": "Add GET /webhooks/:endpointId/events endpoint. Returns paginated event list with status, idempotencyKey, receivedAt. Tenant-scoped via projectId.",
+      "steps": [
+        "Add GET /webhooks/:endpointId/events handler in routes/webhooks.ts",
+        "Implement cursor-based or page+limit pagination",
+        "Validate endpointId param with Zod",
+        "Scope query by projectId for multi-tenancy",
+        "Return events with id, status, idempotencyKey, receivedAt, headers (exclude body for list view)",
+        "Add integration tests: list events for endpoint; empty endpoint -> empty array; cross-tenant -> 404",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "GET events for endpoint with 3 events -> returns 3 items with correct fields",
+        "Pagination works (limit=1 returns 1 item with cursor/next info)",
+        "Cross-tenant endpoint -> 404"
+      ],
+      "passes": false
+    },
+    {
+      "id": "replay-endpoint",
+      "category": "functional",
+      "dependencies": ["event-list-endpoint"],
+      "description": "Add POST /webhooks/:endpointId/events/:eventId/replay endpoint. Re-enqueues FAILED events. Guards against replaying DELIVERED, PENDING, or RETRYING events.",
+      "steps": [
+        "Add POST /webhooks/:endpointId/events/:eventId/replay handler",
+        "Validate endpointId and eventId params with Zod",
+        "Lookup Event by (id, projectId) and verify endpointId matches",
+        "Guard: DELIVERED -> 200 { queued: false, message: 'Already delivered' }",
+        "Guard: PENDING or RETRYING -> 200 { queued: false, message: 'Already in progress' }",
+        "On FAILED: update Event.status = PENDING, enqueue job, return 202 { queued: true, eventId }",
+        "Add integration tests: replay FAILED -> 202; replay DELIVERED -> 200 no-op; unknown eventId -> 404; cross-tenant -> 404",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "POST replay on FAILED event -> 202, Event.status = PENDING, job in queue",
+        "POST replay on DELIVERED event -> 200, { queued: false }",
+        "POST replay on nonexistent event -> 404",
+        "Cross-project event -> 404"
+      ],
+      "passes": false
+    },
+    {
+      "id": "rate-limiting",
+      "category": "security",
+      "dependencies": [],
+      "description": "Register @fastify/rate-limit with Redis store, keyed by projectId. Default 100 req/60s per project. Exclude /health and /metrics from rate limiting. Fail open on Redis failure.",
+      "steps": [
+        "Add @fastify/rate-limit to apps/api/package.json",
+        "Add RATE_LIMIT_MAX (default 100) and RATE_LIMIT_WINDOW_MS (default 60000) to apps/api/src/env.ts",
+        "Register plugin in buildApp with keyGenerator: (req) => req.project?.id ?? req.ip",
+        "Configure Redis store for cross-replica consistency",
+        "Exclude /health and /metrics routes from rate limiting",
+        "Configure fail-open behavior: on Redis error, log warning and allow request",
+        "Add tests: 101st request same project -> 429 with Retry-After; different project -> 200; /health not limited",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "101st request from same project within window -> 429 with Retry-After header",
+        "101st request from different project -> 200",
+        "/health -> 200, not rate-limited"
+      ],
+      "passes": false
+    },
+    {
+      "id": "signing-secret-migration",
+      "category": "security",
+      "dependencies": [],
+      "description": "Add optional signingSecret field to WebhookEndpoint schema. Run migration. signingSecret must never appear in API responses or logs.",
+      "steps": [
+        "Add signingSecret String? to WebhookEndpoint in packages/db/prisma/schema.prisma",
+        "Run pnpm --filter @repo/db migrate dev --name add_signing_secret",
+        "Verify migration applies cleanly (non-destructive, adds column only)",
+        "Ensure existing endpoint queries never select signingSecret for API responses",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Migration applies without error",
+        "Existing endpoints have signingSecret = null",
+        "No regression in existing tests"
+      ],
+      "passes": false
+    },
+    {
+      "id": "hmac-verification",
+      "category": "security",
+      "dependencies": ["signing-secret-migration"],
+      "description": "Implement HMAC-SHA256 signature verification in ingest route. Add verifyWebhookSignature helper using crypto.timingSafeEqual. Configure Fastify raw body preservation.",
+      "steps": [
+        "Add verifyWebhookSignature(rawBody, signatureHeader, secret) to @repo/shared using crypto.timingSafeEqual",
+        "Configure Fastify to preserve raw body (addContentTypeParser or rawBody plugin)",
+        "In POST /webhooks/:endpointId: if endpoint.signingSecret exists, read x-hub-signature-256 header",
+        "Call verifyWebhookSignature, return 401 on failure (before event creation)",
+        "Unit test verifyWebhookSignature: valid -> true; tampered body -> false; wrong secret -> false",
+        "Integration tests: signed correct -> 201; wrong secret -> 401; no header with secret set -> 401; no secret on endpoint -> 201",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Valid HMAC-SHA256 signature -> 201",
+        "Tampered body -> 401",
+        "Wrong secret -> 401",
+        "No signature header, endpoint has secret -> 401",
+        "No signature header, endpoint has no secret -> 201"
+      ],
+      "passes": false
+    },
+    {
+      "id": "prometheus-metrics",
+      "category": "operational",
+      "dependencies": [],
+      "description": "Add Prometheus-compatible metrics using prom-client. Instrument: events_received_total, delivery_attempts_total, delivery_duration_ms, queue_depth, events_status_total. Expose /metrics on API and internal port on worker.",
+      "steps": [
+        "Add prom-client to apps/api/package.json and apps/worker/package.json",
+        "Create packages/shared/src/metrics.ts with metric definitions and shared registry",
+        "Register GET /metrics in buildApp before other routes; exclude from auth + rate limiting",
+        "Increment webhook_events_received_total in ingest route on 201",
+        "Record webhook_delivery_duration_ms and webhook_delivery_attempts_total in processor",
+        "Add minimal HTTP server in worker on METRICS_PORT (env-configurable, default 9091) serving GET /metrics",
+        "Add test: GET /metrics returns 200 with Content-Type text/plain",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "After one ingest, webhook_events_received_total count = 1",
+        "After one delivery, webhook_delivery_attempts_total incremented",
+        "GET /metrics returns valid Prometheus text format"
+      ],
+      "passes": false
+    },
+    {
+      "id": "dockerfiles",
+      "category": "infrastructure",
+      "dependencies": [],
+      "description": "Create production-ready multi-stage Dockerfiles for api, worker, and web apps. Node 24 Alpine base. Prisma client pre-generated. Run as non-root. Add .dockerignore.",
+      "steps": [
+        "Create apps/api/Dockerfile: multi-stage (builder installs deps + generates Prisma + builds; runtime copies artifacts only)",
+        "API entrypoint runs prisma migrate deploy before starting Node",
+        "Create apps/worker/Dockerfile: same multi-stage pattern, no HTTP",
+        "Create apps/web/Dockerfile: set output standalone in next.config.ts, copy .next/standalone",
+        "Add .dockerignore at monorepo root: exclude .git, node_modules, .next, dist, test files",
+        "Verify docker build succeeds for all three apps",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "docker build succeeds for all three apps without errors",
+        "Images run as non-root (USER node)",
+        "No .env files or secrets baked into images"
+      ],
+      "passes": false
+    },
+    {
+      "id": "docker-compose",
+      "category": "infrastructure",
+      "dependencies": ["dockerfiles"],
+      "description": "Update docker-compose.yml to add api, worker, and web services with depends_on (postgres + redis healthchecks). Add .env.example documenting all required env vars.",
+      "steps": [
+        "Add api, worker, web services to docker-compose.yml with proper depends_on and healthchecks",
+        "Configure environment variables to reference .env file",
+        "Create .env.example at repo root documenting all env vars for all three apps",
+        "Test docker-compose up brings all services to healthy state",
+        "Verify curl http://localhost:3001/health returns { status: ok }",
+        "Verify API container with missing env var exits with non-zero code",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "docker-compose up brings all services to healthy state",
+        "curl http://localhost:3001/health -> { status: ok }",
+        "API container with missing env var -> exits non-zero"
+      ],
+      "passes": false
+    },
+    {
+      "id": "load-test",
+      "category": "validation",
+      "dependencies": ["docker-compose"],
+      "description": "Create k6 load test script: ramp to 100 VU, sustain 5 min, assert p95 < 200ms and error rate < 1%. Run against docker-compose stack.",
+      "steps": [
+        "Create scripts/load-test.js (k6 script) with ramp-up and sustained load phases",
+        "Configure thresholds: p95 < 200ms, error rate < 1%",
+        "Document how to run: k6 run scripts/load-test.js",
+        "Run load test against docker-compose stack and verify thresholds pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "p95 ingest latency < 200ms under load",
+        "Error rate < 1% under sustained load"
+      ],
+      "passes": false
+    },
+    {
+      "id": "chaos-tests",
+      "category": "validation",
+      "dependencies": ["docker-compose"],
+      "description": "Create chaos test scripts: Redis disconnect mid-delivery, PostgreSQL disconnect mid-write, worker crash mid-job. Verify graceful degradation and recovery.",
+      "steps": [
+        "Create scripts/chaos-redis.sh: start load, stop Redis, verify graceful degradation, restart, verify recovery",
+        "Create scripts/chaos-db.sh: stop Postgres, verify API returns 503 (not 500), restart, verify recovery",
+        "Assert delivery queue backlog drains within SLA after outage recovery",
+        "Document findings and SLA thresholds in docs/infrastructure.md",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "All events eventually delivered after Redis/Postgres restart",
+        "Worker gracefully reconnects after Redis restart",
+        "Ingest returns 503 (not 500) when DB is down",
+        "No data loss under any tested failure scenario"
+      ],
+      "passes": false
+    },
+    {
+      "id": "dashboard-scaffolding",
+      "category": "frontend",
+      "dependencies": [],
+      "description": "Scaffold the webhook management dashboard in apps/web. Set up project layout, navigation shell, API client for the backend, and authentication context. Install Playwright for E2E testing.",
+      "steps": [
+        "Install a styling solution (e.g., Tailwind CSS) and any UI primitives needed (e.g., shadcn/ui or similar)",
+        "Create app layout with sidebar navigation: Dashboard, Endpoints, Events",
+        "Create a typed API client module (src/lib/api.ts) that calls the Fastify backend with X-Project-Key auth",
+        "Add project selection or API key configuration (settings page or env-based for MVP)",
+        "Install @playwright/test as dev dependency in apps/web",
+        "Create playwright.config.ts with webServer config pointing at Next.js dev server",
+        "Add test scripts to apps/web/package.json: test:e2e, test:e2e:ui",
+        "Create a smoke E2E test: navigate to dashboard -> verify layout renders",
+        "Run npx playwright test to verify setup works",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Next.js dev server starts without errors",
+        "Dashboard layout renders with navigation sidebar",
+        "Playwright smoke test passes: page loads, navigation visible",
+        "API client module exports typed methods for all backend endpoints"
+      ],
+      "passes": false
+    },
+    {
+      "id": "endpoint-list-page",
+      "category": "frontend",
+      "dependencies": ["dashboard-scaffolding"],
+      "description": "Build the Endpoints list page. Displays all webhook endpoints for the current project with their URL, created date, and event count. Links to per-endpoint event views.",
+      "steps": [
+        "Create app/endpoints/page.tsx — server component fetching endpoint list from API",
+        "Display endpoints in a table: name/ID, URL, created date, event count badge",
+        "Each row links to /endpoints/[endpointId]/events",
+        "Handle loading state and empty state (no endpoints configured)",
+        "Handle API errors with user-friendly error boundary or message",
+        "Add Playwright E2E test: verify endpoint list renders with test data",
+        "Run pnpm test and npx playwright test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Endpoints page renders table with endpoint data from API",
+        "Empty state shown when no endpoints exist",
+        "Each endpoint row links to its event list page",
+        "Playwright test: navigate to /endpoints -> table visible with correct columns"
+      ],
+      "passes": false
+    },
+    {
+      "id": "event-list-page",
+      "category": "frontend",
+      "dependencies": ["dashboard-scaffolding", "event-list-endpoint"],
+      "description": "Build the Event list page for a specific endpoint. Displays paginated events with status badges (PENDING/DELIVERED/FAILED/RETRYING), idempotency key, and receivedAt timestamp. Includes replay button for FAILED events.",
+      "steps": [
+        "Create app/endpoints/[endpointId]/events/page.tsx",
+        "Fetch events from GET /webhooks/:endpointId/events with pagination",
+        "Display events in a table: eventId, status badge (color-coded), idempotencyKey, receivedAt",
+        "Add status badge component with distinct colors: PENDING (yellow), DELIVERED (green), FAILED (red), RETRYING (orange)",
+        "Implement pagination controls (next/prev or infinite scroll)",
+        "Add Replay button on FAILED event rows — calls POST .../replay, updates status optimistically",
+        "Show confirmation dialog before replay",
+        "Handle replay success (status changes to PENDING) and replay no-op (already delivered) responses",
+        "Add Playwright E2E tests: event list renders, status badges display correct colors, replay button triggers API call",
+        "Run pnpm test and npx playwright test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Event list page renders with events from the API",
+        "Status badges show correct colors for each EventStatus",
+        "Pagination controls work (navigate between pages)",
+        "Replay button visible only on FAILED events",
+        "Clicking Replay on FAILED event -> confirmation dialog -> API call -> status updates to PENDING",
+        "Playwright test: full replay flow from event list to status update"
+      ],
+      "passes": false
+    },
+    {
+      "id": "event-detail-page",
+      "category": "frontend",
+      "dependencies": ["event-list-page"],
+      "description": "Build the Event detail page. Shows full event payload (headers + body), delivery attempt history with status codes and durations, and a replay action for failed events.",
+      "steps": [
+        "Create app/endpoints/[endpointId]/events/[eventId]/page.tsx",
+        "Fetch event detail including headers, body, status, and delivery attempts",
+        "Display event metadata: ID, status badge, idempotencyKey, receivedAt",
+        "Display request headers and body in formatted JSON viewer (syntax-highlighted, collapsible)",
+        "Display delivery attempt timeline: attemptNumber, requestedAt, respondedAt, statusCode, duration, success/failure",
+        "Add Replay button (same behavior as event list page, with confirmation)",
+        "Add Playwright E2E test: navigate to event detail, verify payload and attempts render",
+        "Run pnpm test and npx playwright test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Event detail page renders with correct event data",
+        "Headers and body displayed in formatted JSON",
+        "Delivery attempt timeline shows all attempts with status codes and durations",
+        "Replay button works for FAILED events",
+        "Playwright test: navigate to event detail from event list -> all sections render"
+      ],
+      "passes": false
+    },
+    {
+      "id": "dashboard-overview",
+      "category": "frontend",
+      "dependencies": ["dashboard-scaffolding"],
+      "description": "Build the Dashboard overview page. Displays key metrics: total events, delivery success rate, events by status breakdown, and recent failed events requiring attention.",
+      "steps": [
+        "Create app/dashboard/page.tsx (or use app/page.tsx as dashboard root)",
+        "Add summary cards: total events count, delivery success rate percentage, active endpoints count",
+        "Add status breakdown: count of events per status (PENDING, DELIVERED, FAILED, RETRYING) with visual indicators",
+        "Add recent failures list: last 10 FAILED events with endpoint name, event ID, last attempt timestamp, and quick replay action",
+        "Fetch data from existing API endpoints (events list, metrics if available)",
+        "Handle loading and error states",
+        "Add Playwright E2E test: dashboard renders with summary cards and failure list",
+        "Run pnpm test and npx playwright test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Dashboard renders summary cards with numeric values from API",
+        "Status breakdown shows correct counts per status",
+        "Recent failures list shows FAILED events with replay action",
+        "Playwright test: dashboard loads, summary cards and failure list visible"
+      ],
+      "passes": false
+    }
+  ]
+}
