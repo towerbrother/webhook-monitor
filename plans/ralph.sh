@@ -67,15 +67,21 @@ for ((i=1; i<=MAX_ITERATIONS; i++)); do
   # The agent reads git log and progress.txt to understand what was done
   # This prevents context window exhaustion and ensures consistent performance
   
+  # Use a temp file to capture output while still streaming to console
+  # This avoids hanging when opencode needs TTY interaction
+  ITERATION_OUTPUT=$(mktemp)
+  trap "rm -f '$ITERATION_OUTPUT'" EXIT
+  
   set +e  # Temporarily disable exit-on-error to capture failures
-  result=$(opencode run "@$PROMPT_FILE" 2>&1)
-  exit_code=$?
+  opencode run "@$PROMPT_FILE" 2>&1 | tee "$ITERATION_OUTPUT" | tee -a "$LOG_FILE"
+  exit_code=${PIPESTATUS[0]}
   set -e
   
   # Process exits here, freeing all context for the next iteration
   
-  # Log the result
-  echo "$result" | tee -a "$LOG_FILE"
+  # Read result from temp file for completion check
+  result=$(cat "$ITERATION_OUTPUT")
+  rm -f "$ITERATION_OUTPUT"
   
   # Check for errors
   if [ $exit_code -ne 0 ]; then
