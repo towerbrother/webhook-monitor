@@ -129,6 +129,15 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
         id: endpointId,
         projectId: project.id,
       },
+      select: {
+        id: true,
+        url: true,
+        // In ingest route, we might need the secret later for HMAC verification (step 16),
+        // but for now we don't expose it in response, so selecting it locally is fine/needed later.
+        // However, Prisma types require us to be explicit if we use select elsewhere.
+        // For now, let's select what we need.
+        signingSecret: true,
+      },
     });
 
     if (!endpoint) {
@@ -242,6 +251,10 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
         id: endpointId,
         projectId: project.id,
       },
+      select: {
+        id: true,
+        // Only selecting needed fields, ensuring signingSecret is NOT selected
+      },
     });
 
     if (!endpoint) {
@@ -323,6 +336,11 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
       where: {
         id: endpointId,
         projectId: project.id,
+      },
+      select: {
+        id: true,
+        url: true,
+        // No signingSecret here
       },
     });
 
