@@ -13,6 +13,16 @@ You are working in an autonomous coding loop with a **FRESH CONTEXT WINDOW**. Yo
 - The codebase state (files, git history) is your only source of truth
 - This ensures consistent performance across many iterations
 
+## Error Handling Principle
+
+**When something goes wrong, DO NOT give up. Persist and find a solution.**
+
+- If a command fails, understand why and try a different approach
+- If tests fail, debug and fix the issue - try at least 3 different solutions
+- If you hit a blocker, document it thoroughly and try alternative approaches
+- Only after exhausting multiple attempts should you consider a feature blocked
+- **Never exit an iteration with uncommitted broken state** - either fix it or revert
+
 ## 1. Get Your Bearings
 
 Start every session by understanding the current state:
@@ -24,9 +34,29 @@ Start every session by understanding the current state:
 - Read @plans/progress.txt to understand what was done in previous iterations
 - Read @plans/prd.json to see the full feature list
 
-**CRITICAL:** You should ALWAYS be on branch `ralph/autonomous`. If not, stop and investigate.
+**CRITICAL:** You should ALWAYS be on branch `ralph/autonomous`. If not, switch to it:
 
-## 2. Select the Highest-Priority Feature
+```bash
+git checkout ralph/autonomous
+```
+
+## 2. Handle Uncommitted Changes
+
+Check for leftover state from previous iterations:
+
+```bash
+git status
+```
+
+If there are uncommitted changes:
+
+1. **Assess the state** - run `pnpm lint && pnpm check-types && pnpm test`
+2. **If all checks pass** - the previous iteration likely completed but failed to commit. Review the changes, commit them with an appropriate message, and update prd.json if needed.
+3. **If checks fail** - try to fix the issues. If unfixable after 2-3 attempts, revert: `git checkout .`
+
+Document any recovery actions in progress.txt.
+
+## 3. Select the Next Feature
 
 Choose ONE feature to work on using these criteria:
 
@@ -43,7 +73,7 @@ Choose ONE feature to work on using these criteria:
 
 **Document your selection rationale** in progress.txt explaining why you chose this feature.
 
-## 3. Verify Baseline Health
+## 4. Verify Baseline Health
 
 Before implementing, ensure the codebase is in a clean state:
 
@@ -59,7 +89,7 @@ pnpm test
 - Document the fix in progress.txt
 - Commit the fix with message: "fix: restore green baseline - <brief description>"
 
-## 4. Implement the Feature
+## 5. Implement the Feature
 
 Follow the feature's `steps` array from prd.json:
 
@@ -67,7 +97,9 @@ Follow the feature's `steps` array from prd.json:
 - Document each step in progress.txt with timestamp, files modified, and result
 - If you encounter blockers, document them and consider selecting a different feature
 
-## 5. Verify with Gateway Tests
+## 6. Verify with Gateway Tests
+
+**Gateway tests are NON-NEGOTIABLE. You must not exit the iteration until all gateway tests pass.**
 
 Before marking a feature complete, run ALL tests listed in the feature's `gatewayTests` array:
 
@@ -89,11 +121,21 @@ Before marking a feature complete, run ALL tests listed in the feature's `gatewa
 
 **If any gateway test fails:**
 
-- Debug and fix the issue
-- Re-run ALL gateway tests
-- Do NOT mark the feature complete until all tests pass
+1. **Do NOT give up.** Analyze the failure and try a different approach.
+2. Try at least 3 different solutions before considering the feature blocked.
+3. For each attempt:
+   - Document what you tried
+   - Document why it failed
+   - Document what you'll try next
+4. Re-run ALL gateway tests after each fix attempt.
+5. Only after exhausting multiple approaches AND documenting them, you may:
+   - Revert your changes: `git checkout .`
+   - Document the blocker in progress.txt with details of all attempted solutions
+   - Select a different feature to work on
 
-## 6. Run Full Test Suite
+**CRITICAL:** Do NOT mark the feature complete until ALL gateway tests pass. Do NOT exit the iteration with failing gateway tests unless you have tried multiple approaches and documented the blocker.
+
+## 7. Run Full Test Suite
 
 After implementation and gateway tests:
 
@@ -105,7 +147,7 @@ pnpm test        # Must pass
 
 All checks must be green before proceeding.
 
-## 7. Update the PRD
+## 8. Update the PRD
 
 In @plans/prd.json, update ONLY the `passes` field for your feature:
 
@@ -118,7 +160,7 @@ In @plans/prd.json, update ONLY the `passes` field for your feature:
 
 **CRITICAL:** Do NOT edit any other fields. Do NOT remove features. Do NOT modify descriptions, steps, or gatewayTests.
 
-## 8. Document Your Progress
+## 9. Document Your Progress
 
 **CRITICAL: progress.txt is an APPEND-ONLY file. You must NEVER overwrite it.**
 
@@ -162,12 +204,23 @@ If using a file write tool, you must include ALL existing content plus your new 
 - Verification (lint/types/tests)
 - Completion summary with commit hash
 
-## 9. Commit Your Work
+## 10. Commit Your Work
+
+**IMPORTANT:** All feature-related changes must be committed together in a single commit. This includes:
+
+- Implementation code changes
+- Updated `plans/prd.json` (with `passes: true`)
+- Updated `plans/progress.txt` (with session documentation)
 
 Create a descriptive commit on the ralph/autonomous branch:
 
 ```bash
+# Stage ALL changes including progress.txt and prd.json
 git add .
+
+# Verify progress.txt and prd.json are staged
+git status
+
 git commit -m "<type>(<scope>): <description>
 
 <optional body with more details>
@@ -191,9 +244,16 @@ git log -1
 git show --stat
 ```
 
-**DO NOT push to remote.** The branch will be pushed at the end when all features are complete.
+**CRITICAL:** Verify that `plans/progress.txt` and `plans/prd.json` are included in the commit output above. If they are missing, amend the commit to include them:
 
-## 10. Check for Completion
+```bash
+git add plans/progress.txt plans/prd.json
+git commit --amend --no-edit
+```
+
+**DO NOT push to remote.** The branch will be pushed manually by the developer after reviewing the work.
+
+## 11. Check for Completion
 
 After updating the PRD, count remaining features:
 
@@ -204,62 +264,21 @@ grep -c '"passes": false' plans/prd.json
 
 **If ALL 37 features have `passes: true`:**
 
-1. Push the branch to remote:
+Output completion signal:
 
-   ```bash
-   git push -u origin ralph/autonomous
-   ```
+```
+<promise>COMPLETE</promise>
+```
 
-2. Create ONE final PR with all 37 features:
-
-   ```bash
-   gh pr create \
-     --title "feat: implement all 37 webhook-monitor features" \
-     --body "$(cat <<'EOF'
-   ## Summary
-
-   Autonomous implementation of all 37 features from the PRD:
-
-   ### Functional Features (Core webhook system)
-   - <list all functional feature IDs and brief descriptions>
-
-   ### Security Features
-   - <list all security feature IDs and brief descriptions>
-
-   ### Operational Features
-   - <list all operational feature IDs and brief descriptions>
-
-   ### Infrastructure Features
-   - <list all infrastructure feature IDs and brief descriptions>
-
-   ### Testing Features
-   - <list all testing feature IDs and brief descriptions>
-
-   ### Validation Features
-   - <list all validation feature IDs and brief descriptions>
-
-   ### Frontend Features
-   - <list all frontend feature IDs and brief descriptions>
-
-   **All tests passing:** Yes
-   **Total commits:** <count commits on ralph/autonomous>
-   **Branch:** ralph/autonomous
-   EOF
-   )" \
-     --assignee @me
-   ```
-
-3. Output completion signal:
-   ```
-   <promise>COMPLETE</promise>
-   ```
+This signals the Ralph loop to exit successfully. The branch push and PR creation will be handled manually by the developer after reviewing the work.
 
 **If features remain (`passes: false`):**
 
 - Exit cleanly (the loop will start your next iteration)
-- Do NOT push or create PR yet
 
 **On the next iteration, a fresh context window will start and implement the next feature on the same ralph/autonomous branch.**
+
+**IMPORTANT:** Ralph should ONLY commit locally. Do NOT push to remote or create PRs - this is handled separately after human review.
 
 ---
 
@@ -279,10 +298,10 @@ Do NOT:
 
 ## Completion Signal
 
-If, after updating the PRD, you verify that ALL 37 features have `passes: true`, follow step 10 above to push the branch, create the final PR, and output:
+If, after updating the PRD, you verify that ALL 37 features have `passes: true`, output:
 
 ```
 <promise>COMPLETE</promise>
 ```
 
-This signals the Ralph loop to exit successfully.
+This signals the Ralph loop to exit successfully. Do NOT push or create PRs - this is handled separately.
