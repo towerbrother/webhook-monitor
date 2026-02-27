@@ -1,5 +1,6 @@
 import { Worker, QUEUE_NAMES, type WebhookDeliveryJobData } from "@repo/queue";
 import { APP_NAME } from "@repo/shared";
+import { createPrismaClient } from "@repo/db";
 import { validateEnv } from "./env.js";
 import { processWebhookDelivery } from "./processor.js";
 
@@ -20,11 +21,14 @@ async function main() {
 ╚════════════════════════════════════════════╝
   `);
 
+  // Initialise Prisma client (connected lazily on first query)
+  const prisma = createPrismaClient();
+
   // Create BullMQ worker
   const worker = new Worker<WebhookDeliveryJobData>(
     QUEUE_NAMES.WEBHOOK_DELIVERY,
     async (job) => {
-      await processWebhookDelivery(job, { logger });
+      await processWebhookDelivery(job, { logger, prisma });
     },
     {
       connection: {
@@ -68,6 +72,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     console.log(`\n📴 Received ${signal}, shutting down gracefully...`);
     await worker.close();
+    await prisma.$disconnect();
     console.log("👋 Worker stopped");
     process.exit(0);
   };
