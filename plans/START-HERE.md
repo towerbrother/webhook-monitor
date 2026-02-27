@@ -68,14 +68,13 @@ Then press Enter.
 
 **What will happen:**
 
-1. The computer will ask: "Do you want option 1 or 2?"
-   - Type `2` and press Enter (this uses Docker sandbox - safer!)
-2. Ralph will wake up and:
-   - Create a special branch called `ralph/autonomous` (this is Ralph's workspace!)
-   - Check if everything is installed
-   - Make sure all the tests pass
-   - Create helper files
-   - Make a special "starting point" commit
+Ralph will wake up and:
+
+- Create a special branch called `ralph/autonomous` (this is Ralph's workspace!)
+- Check if everything is installed
+- Make sure all the tests pass
+- Create helper files
+- Make a special "starting point" commit
 
 **This takes about 5-10 minutes.**
 
@@ -97,18 +96,15 @@ Type this:
 
 **What will happen:**
 
-1. Computer asks: "Option 1 or 2?"
-   - Type `2` and press Enter (Docker sandbox - safer!)
-2. Ralph wakes up
-3. Ralph reads the to-do list (prd.json)
-4. Ralph picks ONE thing to build
-5. Ralph builds it
-6. Ralph tests it
-7. Ralph makes a commit
-8. Ralph goes to sleep
-9. Ralph tests it
-10. Ralph makes a commit
-11. Ralph goes to sleep
+Ralph will:
+
+1. Wake up
+2. Read the to-do list (prd.json)
+3. Pick ONE thing to build
+4. Build it
+5. Test it
+6. Make a commit
+7. Go to sleep
 
 You can watch what Ralph is doing! When he's done, check:
 
@@ -127,16 +123,10 @@ Now that you've seen Ralph work once, you can let him do MANY things while you g
 Type this:
 
 ```bash
-./plans/ralph.sh 20 sandbox
-```
-
-This means: "Ralph, please do 20 things from the to-do list in a Docker sandbox!"
-
-Or without sandbox:
-
-```bash
 ./plans/ralph.sh 20
 ```
+
+This means: "Ralph, please do 20 things from the to-do list!"
 
 **What will happen:**
 
@@ -277,27 +267,6 @@ Now you (or a teammate) can:
 - Review all the code on GitHub
 - Test it to make sure everything works
 - Merge the pull request to put all 37 features into `main`
-
----
-
-## 🤓 Advanced: Running in Sandbox
-
-**What is a sandbox?**
-
-Think of a sandbox like a playpen for babies. Ralph can play inside, but he can't mess up anything outside the playpen.
-
-When you choose option `2` (Docker sandbox), Ralph runs inside a special container that:
-
-- Can't access your other files
-- Can't mess up your computer
-- Can only work on the webhook-monitor project
-
-This is MUCH safer than letting Ralph run directly on your computer!
-
-To use sandboxes:
-
-- Choose option `2` during `ralph-init.sh` and `ralph-once.sh`
-- Add `sandbox` parameter: `./plans/ralph.sh 20 sandbox`
 
 ---
 
