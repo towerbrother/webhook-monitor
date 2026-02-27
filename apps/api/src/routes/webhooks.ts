@@ -13,6 +13,48 @@ const IdempotencyKeySchema = z
   .string()
   .max(255, "Idempotency key must not exceed 255 characters");
 
+const EventsQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(50),
+  cursor: z.string().optional(),
+});
+
+const ReplayParamsSchema = z.object({
+  endpointId: z.string().min(1, "endpointId must not be empty"),
+  eventId: z.string().min(1, "eventId must not be empty"),
+});
+
+// Simple in-memory rate limiter for replay endpoints
+// Map<projectId, { count: number, resetTime: number }>
+const replayRateLimiter = new Map<
+  string,
+  { count: number; resetTime: number }
+>();
+
+function checkReplayRateLimit(projectId: string): boolean {
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute
+  const maxReplays = 10; // 10 replays per minute
+
+  let record = replayRateLimiter.get(projectId);
+
+  // Initialize or reset if window expired
+  if (!record || now > record.resetTime) {
+    record = {
+      count: 1, // Start at 1
+      resetTime: now + windowMs,
+    };
+    replayRateLimiter.set(projectId, record);
+    return true;
+  }
+
+  if (record.count >= maxReplays) {
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
+
 /**
  * Extract and validate idempotency key from request headers
  * Returns undefined if header is not present
@@ -87,6 +129,15 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
         id: endpointId,
         projectId: project.id,
       },
+      select: {
+        id: true,
+        url: true,
+        // In ingest route, we might need the secret later for HMAC verification (step 16),
+        // but for now we don't expose it in response, so selecting it locally is fine/needed later.
+        // However, Prisma types require us to be explicit if we use select elsewhere.
+        // For now, let's select what we need.
+        signingSecret: true,
+      },
     });
 
     if (!endpoint) {
@@ -121,6 +172,7 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
         headers: request.headers as Record<string, unknown>,
         body: request.body,
         attempt: 1,
+        correlationId: request.id,
       }).catch((err: unknown) => {
         // Log error but don't fail the request
         fastify.log.error(
@@ -159,6 +211,195 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
       // Re-throw any other error
       throw error;
     }
+  });
+
+  /**
+   * GET /webhooks/:endpointId/events
+   * List events for a specific endpoint with pagination
+   */
+  fastify.get<{
+    Params: { endpointId: string };
+    Querystring: { limit?: number; cursor?: string };
+  }>("/webhooks/:endpointId/events", async (request, reply) => {
+    // Validate params
+    const paramsValidation = EndpointParamsSchema.safeParse(request.params);
+    if (!paramsValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid endpoint ID",
+        details: paramsValidation.error.issues,
+      });
+    }
+
+    // Validate query params
+    const queryValidation = EventsQuerySchema.safeParse(request.query);
+    if (!queryValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid pagination parameters",
+        details: queryValidation.error.issues,
+      });
+    }
+
+    const { endpointId } = paramsValidation.data;
+    const { limit, cursor } = queryValidation.data;
+    const { project } = request;
+
+    // Verify endpoint belongs to the authenticated project
+    const endpoint = await fastify.prisma.webhookEndpoint.findFirst({
+      where: {
+        id: endpointId,
+        projectId: project.id,
+      },
+      select: {
+        id: true,
+        // Only selecting needed fields, ensuring signingSecret is NOT selected
+      },
+    });
+
+    if (!endpoint) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message:
+          "Webhook endpoint not found or does not belong to this project",
+      });
+    }
+
+    // Fetch events
+    const events = await fastify.prisma.event.findMany({
+      take: limit + 1, // Fetch one extra to determine if there are more
+      cursor: cursor ? { id: cursor } : undefined,
+      skip: cursor ? 1 : 0, // Skip the cursor itself if present
+      where: {
+        endpointId: endpoint.id,
+        projectId: project.id,
+      },
+      orderBy: {
+        receivedAt: "desc",
+      },
+      select: {
+        id: true,
+        status: true,
+        idempotencyKey: true,
+        receivedAt: true,
+        headers: true,
+      },
+    });
+
+    const hasNextPage = events.length > limit;
+    const results = hasNextPage ? events.slice(0, limit) : events;
+    const nextCursor =
+      hasNextPage && results.length > 0
+        ? results[results.length - 1]?.id
+        : undefined;
+
+    return reply.status(200).send({
+      data: results,
+      pagination: {
+        limit,
+        nextCursor,
+        hasNextPage,
+      },
+    });
+  });
+
+  /**
+   * POST /webhooks/:endpointId/events/:eventId/replay
+   * Replay a failed webhook event
+   */
+  fastify.post<{
+    Params: { endpointId: string; eventId: string };
+  }>("/webhooks/:endpointId/events/:eventId/replay", async (request, reply) => {
+    // Validate params
+    const paramsValidation = ReplayParamsSchema.safeParse(request.params);
+    if (!paramsValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid endpoint or event ID",
+        details: paramsValidation.error.issues,
+      });
+    }
+
+    const { endpointId, eventId } = paramsValidation.data;
+    const { project } = request;
+
+    // Check rate limit
+    if (!checkReplayRateLimit(project.id)) {
+      return reply.status(429).send({
+        error: "Too Many Requests",
+        message: "Replay rate limit exceeded (10 per minute)",
+      });
+    }
+
+    // Verify endpoint belongs to the authenticated project
+    const endpoint = await fastify.prisma.webhookEndpoint.findFirst({
+      where: {
+        id: endpointId,
+        projectId: project.id,
+      },
+      select: {
+        id: true,
+        url: true,
+        // No signingSecret here
+      },
+    });
+
+    if (!endpoint) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message: "Webhook endpoint not found",
+      });
+    }
+
+    // Verify event belongs to the endpoint and project
+    const event = await fastify.prisma.event.findFirst({
+      where: {
+        id: eventId,
+        endpointId: endpoint.id,
+        projectId: project.id,
+      },
+    });
+
+    if (!event) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message: "Event not found",
+      });
+    }
+
+    // Only allow replaying FAILED events
+    if (event.status !== "FAILED") {
+      return reply.status(200).send({
+        success: true,
+        message: "Event is not in FAILED status, skipping replay",
+        status: event.status,
+      });
+    }
+
+    // Update status to PENDING
+    await fastify.prisma.event.update({
+      where: { id: event.id },
+      data: { status: "PENDING" },
+    });
+
+    // Enqueue delivery job
+    await enqueueWebhookDelivery(fastify.queue, {
+      eventId: event.id,
+      projectId: project.id,
+      endpointId: endpoint.id,
+      url: endpoint.url,
+      method: event.method,
+      headers: (event.headers as Record<string, unknown>) ?? {},
+      body: event.body,
+      attempt: 1,
+      correlationId: request.id,
+    });
+
+    return reply.status(202).send({
+      success: true,
+      message: "Event replayed successfully",
+      eventId: event.id,
+    });
   });
 
   /**

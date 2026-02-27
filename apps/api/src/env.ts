@@ -20,6 +20,27 @@ const envSchema = z.object({
     .refine((val) => !isNaN(val) && val > 0 && val < 65536, {
       message: "REDIS_PORT must be a valid port number (1-65535)",
     }),
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default("info"),
+  RATE_LIMIT_MAX: z
+    .string()
+    .default("100")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "RATE_LIMIT_MAX must be a positive integer",
+    }),
+  RATE_LIMIT_WINDOW_MS: z
+    .string()
+    .default("60000") // 60 seconds
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "RATE_LIMIT_WINDOW_MS must be a positive integer",
+    }),
+  RATE_LIMIT_FAIL_OPEN: z
+    .string()
+    .default("false")
+    .transform((val) => val === "true"),
 });
 
 export type Env = z.infer<typeof envSchema>;

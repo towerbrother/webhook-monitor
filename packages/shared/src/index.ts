@@ -23,3 +23,5 @@ export interface HealthCheckResponse {
   timestamp: string;
   service: string;
 }
+
+export * from "./dto.js";

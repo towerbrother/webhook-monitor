@@ -43,6 +43,8 @@ model WebhookEndpoint {
   url       String   @unique // Unique identifier (e.g., "ep_abc123")
   name      String
   projectId String
+  /// @sensitive - never expose in API responses or logs
+  signingSecret String? @db.Text
   createdAt DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
