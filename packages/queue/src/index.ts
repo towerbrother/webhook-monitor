@@ -29,6 +29,7 @@ export interface WebhookDeliveryJobData {
   headers: Record<string, unknown>;
   body: unknown;
   attempt: number;
+  correlationId?: string;
 }
 
 /**

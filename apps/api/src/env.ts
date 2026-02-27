@@ -20,6 +20,9 @@ const envSchema = z.object({
     .refine((val) => !isNaN(val) && val > 0 && val < 65536, {
       message: "REDIS_PORT must be a valid port number (1-65535)",
     }),
+  LOG_LEVEL: z
+    .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+    .default("info"),
 });
 
 export type Env = z.infer<typeof envSchema>;

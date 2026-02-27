@@ -38,6 +38,7 @@ export async function processWebhookDelivery(
 ): Promise<void> {
   const { eventId, projectId, endpointId, url, method, headers, body } =
     job.data;
+  const correlationId = job.data.correlationId ?? job.id ?? "unknown";
   const { logger, prisma } = context;
 
   const attemptNumber = job.attemptsMade + 1;
@@ -52,6 +53,7 @@ export async function processWebhookDelivery(
       url,
       attempt: attemptNumber,
       jobId: job.id,
+      correlationId,
     },
     "Processing webhook delivery job"
   );
@@ -100,14 +102,17 @@ export async function processWebhookDelivery(
       });
 
       if (!event) {
-        logger.error({ eventId, projectId }, "Event not found during delivery");
+        logger.error(
+          { eventId, projectId, correlationId },
+          "Event not found during delivery"
+        );
         return;
       }
 
       // Short-circuit if event is already terminal (e.g. duplicate job execution)
       if (event.status === EventStatus.DELIVERED) {
         logger.info(
-          { eventId },
+          { eventId, correlationId },
           "Event already delivered, skipping status update"
         );
         return;
@@ -138,6 +143,7 @@ export async function processWebhookDelivery(
       {
         eventId,
         projectId,
+        correlationId,
         error: dbError instanceof Error ? dbError.message : String(dbError),
       },
       "Failed to persist delivery attempt"
@@ -154,6 +160,7 @@ export async function processWebhookDelivery(
         statusCode,
         attempt: attemptNumber,
         jobId: job.id,
+        correlationId,
       },
       "Webhook delivery successful"
     );
@@ -167,6 +174,7 @@ export async function processWebhookDelivery(
         attempt: attemptNumber,
         jobId: job.id,
         isLastAttempt,
+        correlationId,
       },
       "Webhook delivery failed"
     );

@@ -1,32 +1,8 @@
-################################################################################
-#                                                                              #
-#  WEBHOOK-MONITOR RALPH PROGRESS LOG                                         #
-#  Autonomous Coding Session Tracker                                          #
-#                                                                              #
-#  Instructions:                                                               #
-#  - This is an APPEND-ONLY log (never edit previous entries)                 #
-#  - Each agent iteration adds exactly one session block                       #
-#  - Cross-reference feature IDs with plans/prd.json                           #
-#  - Link git commits to enable time-travel debugging                          #
-#                                                                              #
-################################################################################
-
-Project: webhook-monitor
-Plan File: plans/prd.json
-Total Features: 37
-Methodology: Ralph Wiggum Technique — bash loop + structured plan + one-task-per-iteration
-
-References:
-  - https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents
-  - https://ghuntley.com/ralph/
-  - https://github.com/ghuntley/how-to-ralph-wiggum
-
-Initialized: Fri Feb 27 2026
 
 ================================================================================
-SESSION: 2026-02-27 (Iteration 1)
+SESSION: 2026-02-27 (Iteration 3)
 Branch: ralph/autonomous
-Feature: worker-integration-test
+Feature: correlation-id
 ================================================================================
 
 1. PRE-FLIGHT CHECKS
@@ -37,25 +13,26 @@ Feature: worker-integration-test
 
 2. FEATURE SELECTION
 --------------------
-Selected: worker-integration-test
+Selected: correlation-id
 Rationale:
-- First feature with passes: false
-- No blocking dependencies
-- Critical to verify worker functionality before proceeding to operational features
+- Next functional feature in line
+- Dependencies (pino-logger-worker) are satisfied
+- Critical for request tracing across distributed services (API -> Queue -> Worker)
 
 3. IMPLEMENTATION STEPS
 -----------------------
 Plan:
-1. Create integration test in apps/worker/src/__tests__/worker.integration.test.ts
-2. Use a mock HTTP server (nock or similar) to simulate the webhook target
-3. Enqueue a job using the shared queue
-4. Wait for the worker to process it
-5. Verify database state (DeliveryAttempt created, Event status updated)
+1. Update WebhookDeliveryJobData interface in packages/queue/src/index.ts to include correlationId
+2. Update apps/api/src/routes/webhooks.ts to pass request.id as correlationId when enqueuing
+3. Verify/Add LOG_LEVEL in apps/api/src/env.ts
+4. Update apps/worker/src/processor.ts to extract correlationId (fallback to job.id) and include in logs
+5. Update apps/worker/src/__tests__/processor.test.ts to verify correlationId logging
+6. Verify integration
 
 4. GATEWAY TESTS
 ----------------
-[x] Enqueued job against mock 200 server -> Event.status = DELIVERED, DeliveryAttempt.success = true
-[x] Enqueued job against mock 500 server -> Event.status = RETRYING, DeliveryAttempt.success = false
+[x] Processor completion log includes correlationId matching value set at ingestion (verified via unit test)
+[x] Job without correlationId (old format) falls back to job.id (verified via unit test)
 
 5. VERIFICATION
 ---------------
@@ -65,5 +42,5 @@ Plan:
 
 6. COMPLETION
 -------------
-[x] PRD updated
-[x] Commit created
+[ ] PRD updated
+[ ] Commit created

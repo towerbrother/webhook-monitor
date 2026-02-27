@@ -121,6 +121,7 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
         headers: request.headers as Record<string, unknown>,
         body: request.body,
         attempt: 1,
+        correlationId: request.id,
       }).catch((err: unknown) => {
         // Log error but don't fail the request
         fastify.log.error(

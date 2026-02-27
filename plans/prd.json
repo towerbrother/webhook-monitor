@@ -122,7 +122,7 @@
         "Processor completion log includes correlationId matching value set at ingestion",
         "Job without correlationId (old format) falls back to job.id"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "event-list-endpoint",

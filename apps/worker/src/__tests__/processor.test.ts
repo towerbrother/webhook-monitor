@@ -381,4 +381,50 @@ describe("processWebhookDelivery", () => {
       expect(mockTx.event.update).not.toHaveBeenCalled();
     });
   });
+
+  describe("correlationId logging", () => {
+    it("should include correlationId from job data in logs", async () => {
+      const logger = createMockLogger();
+      const prisma = createMockPrisma("PENDING");
+      const job = createMockJob({ correlationId: "req-123" });
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" })
+      );
+
+      await processWebhookDelivery(job, { logger, prisma });
+
+      // Check log calls include correlationId
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: "req-123" }),
+        "Processing webhook delivery job"
+      );
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: "req-123" }),
+        "Webhook delivery successful"
+      );
+    });
+
+    it("should fall back to job.id if correlationId is missing", async () => {
+      const logger = createMockLogger();
+      const prisma = createMockPrisma("PENDING");
+      const job = createMockJob({ correlationId: undefined });
+      // Ensure job has an ID
+      (job as unknown as { id: string }).id = "job-fallback-id";
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" })
+      );
+
+      await processWebhookDelivery(job, { logger, prisma });
+
+      // Check log calls use job.id as fallback
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ correlationId: "job-fallback-id" }),
+        "Processing webhook delivery job"
+      );
+    });
+  });
 });
