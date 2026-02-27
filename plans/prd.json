@@ -75,7 +75,7 @@
         "Enqueued job against mock 200 server -> Event.status = DELIVERED, DeliveryAttempt.success = true",
         "Enqueued job against mock 500 server -> Event.status = RETRYING, DeliveryAttempt.success = false"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "pino-logger-worker",
