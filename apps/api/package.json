@@ -13,10 +13,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fastify/rate-limit": "^10.3.0",
     "@repo/db": "workspace:*",
     "@repo/queue": "workspace:*",
     "@repo/shared": "workspace:*",
     "fastify": "^5.7.4",
+    "ioredis": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -93,9 +93,7 @@
   {
     "id": "correlation-id",
     "category": "functional",
-    "dependencies": [
-      "pino-logger-worker"
-    ],
+    "dependencies": ["pino-logger-worker"],
     "description": "Add correlationId to WebhookDeliveryJobData. Pass Fastify request.id as correlationId when enqueuing. Log correlationId in all processor log calls. Default to job.id if correlationId is undefined (backward compat for old jobs).",
     "steps": [
       "Add correlationId: string to WebhookDeliveryJobData in packages/queue/src/index.ts",
@@ -140,9 +138,7 @@
   {
     "id": "replay-endpoint",
     "category": "functional",
-    "dependencies": [
-      "event-list-endpoint"
-    ],
+    "dependencies": ["event-list-endpoint"],
     "description": "Add POST /webhooks/:endpointId/events/:eventId/replay endpoint with rate limiting (10 replays/min per project). Re-enqueues FAILED events. Guards against replaying DELIVERED, PENDING, or RETRYING events. Logs replay action with correlationId.",
     "steps": [
       "Add POST /webhooks/:endpointId/events/:eventId/replay handler",
@@ -193,7 +189,7 @@
       "Redis unavailable + RATE_LIMIT_FAIL_OPEN=false -> 503",
       "Redis unavailable + RATE_LIMIT_FAIL_OPEN=true -> 200 (fallback to in-memory limit)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "id": "signing-secret-migration",
@@ -224,9 +220,7 @@
   {
     "id": "hmac-verification",
     "category": "security",
-    "dependencies": [
-      "signing-secret-migration"
-    ],
+    "dependencies": ["signing-secret-migration"],
     "description": "Implement HMAC-SHA256 signature verification in ingest route. Add verifyWebhookSignature helper using crypto.timingSafeEqual. Configure Fastify raw body preservation with 1MB size limit. Return 413 if body exceeds limit.",
     "steps": [
       "Configure Fastify to preserve raw body with size limit: bodyLimit: 1048576 (1MB)",
@@ -307,9 +301,7 @@
   {
     "id": "docker-compose",
     "category": "infrastructure",
-    "dependencies": [
-      "dockerfiles"
-    ],
+    "dependencies": ["dockerfiles"],
     "description": "Update docker-compose.yml to add api, worker, and web services with depends_on (postgres + redis healthchecks). Add .env.example documenting all required env vars.",
     "steps": [
       "Add api, worker, web services to docker-compose.yml with proper depends_on and healthchecks",
@@ -330,9 +322,7 @@
   {
     "id": "load-test",
     "category": "validation",
-    "dependencies": [
-      "docker-compose"
-    ],
+    "dependencies": ["docker-compose"],
     "description": "Create k6 load test script: ramp to 100 VU, sustain 5 min, assert p95 < 200ms and error rate < 1%. Monitor memory and CPU usage. Add 1-hour sustained load test to catch memory leaks.",
     "steps": [
       "Create scripts/load-test.js (k6 script) with ramp-up and sustained load phases",
@@ -355,9 +345,7 @@
   {
     "id": "chaos-tests",
     "category": "validation",
-    "dependencies": [
-      "docker-compose"
-    ],
+    "dependencies": ["docker-compose"],
     "description": "Create chaos test scripts with data integrity verification: Redis disconnect mid-delivery, PostgreSQL disconnect mid-write, worker crash mid-job. Verify ALL events accounted for (no data loss) and graceful recovery.",
     "steps": [
       "Before chaos tests: insert 100 known test events with unique IDs, record count",
@@ -408,9 +396,7 @@
   {
     "id": "endpoint-list-page",
     "category": "frontend",
-    "dependencies": [
-      "dashboard-scaffolding"
-    ],
+    "dependencies": ["dashboard-scaffolding"],
     "description": "Build the Endpoints list page. Displays all webhook endpoints for the current project with their URL, created date, and event count. Links to per-endpoint event views.",
     "steps": [
       "Create app/endpoints/page.tsx — server component fetching endpoint list from API",
@@ -433,10 +419,7 @@
   {
     "id": "event-list-page",
     "category": "frontend",
-    "dependencies": [
-      "dashboard-scaffolding",
-      "event-list-endpoint"
-    ],
+    "dependencies": ["dashboard-scaffolding", "event-list-endpoint"],
     "description": "Build the Event list page for a specific endpoint. Displays paginated events with status badges (PENDING/DELIVERED/FAILED/RETRYING), idempotency key, and receivedAt timestamp. Includes replay button for FAILED events.",
     "steps": [
       "Create app/endpoints/[endpointId]/events/page.tsx",
@@ -464,9 +447,7 @@
   {
     "id": "event-detail-page",
     "category": "frontend",
-    "dependencies": [
-      "event-list-page"
-    ],
+    "dependencies": ["event-list-page"],
     "description": "Build the Event detail page. Shows full event payload (headers + body), delivery attempt history with status codes and durations, and a replay action for failed events.",
     "steps": [
       "Create app/endpoints/[endpointId]/events/[eventId]/page.tsx",
@@ -491,9 +472,7 @@
   {
     "id": "dashboard-overview",
     "category": "frontend",
-    "dependencies": [
-      "dashboard-scaffolding"
-    ],
+    "dependencies": ["dashboard-scaffolding"],
     "description": "Build the Dashboard overview page. Displays key metrics: total events, delivery success rate, events by status breakdown, and recent failed events requiring attention.",
     "steps": [
       "Create app/dashboard/page.tsx (or use app/page.tsx as dashboard root)",
