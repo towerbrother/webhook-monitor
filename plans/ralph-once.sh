@@ -25,7 +25,7 @@ echo ""
 echo "Running OpenCode..."
 echo ""
 
-opencode -p "$(cat "$PROMPT_FILE")"
+opencode run "@$PROMPT_FILE"
 
 echo ""
 echo "================================================================================"

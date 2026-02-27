@@ -68,7 +68,7 @@ for ((i=1; i<=MAX_ITERATIONS; i++)); do
   # This prevents context window exhaustion and ensures consistent performance
   
   set +e  # Temporarily disable exit-on-error to capture failures
-  result=$(opencode -p "$(cat "$PROMPT_FILE")" 2>&1)
+  result=$(opencode run "@$PROMPT_FILE" 2>&1)
   exit_code=$?
   set -e
   

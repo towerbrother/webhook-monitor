@@ -37,7 +37,7 @@ echo ""
 echo "Running initialization with OpenCode..."
 echo ""
 
-opencode -p "$(cat "$INIT_PROMPT")"
+opencode run "@$INIT_PROMPT"
 
 echo ""
 echo "================================================================================"
