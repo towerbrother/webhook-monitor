@@ -219,3 +219,41 @@ Plan:
 [x] Commit created (9ee7f11)
 
 ================================================================================
+SESSION: 2026-02-27 (Iteration 5)
+Branch: ralph/autonomous
+Feature: replay-endpoint
+Commit: pending
+================================================================================
+
+1. PRE-FLIGHT CHECKS
+--------------------
+[x] Branch is ralph/autonomous
+[x] Working directory verified
+[x] Baseline health check (lint/types/test): PASSED
+
+2. FEATURE SELECTION
+--------------------
+Selected: replay-endpoint
+Rationale:
+- High priority functional feature
+- Dependencies (event-list-endpoint) are satisfied
+- Completes the core event management lifecycle (Ingest -> List -> Replay)
+
+3. IMPLEMENTATION STEPS
+-----------------------
+Plan:
+1.  Read `apps/api/src/routes/webhooks.ts` to locate where to add the new route.
+2.  Define Zod schema for route params (endpointId, eventId).
+3.  Implement `POST /webhooks/:endpointId/events/:eventId/replay`.
+4.  Add rate limiting logic (10 replays/min per project).
+    - Note: Since `rate-limiting` feature is not yet implemented, I will implement a simple in-memory counter for now or skip if the instruction implies using the general rate limiter. The description says "Apply rate limit: 10 replays per minute per projectId (use in-memory or Redis counter)". I'll use a simple in-memory map for this MVP step to avoid complex Redis setup before the main rate-limit feature.
+5.  Implement the replay logic:
+    - Validate endpoint ownership.
+    - Fetch event.
+    - Guard against non-FAILED status (DELIVERED -> 200, PENDING/RETRYING -> 200).
+    - If FAILED:
+        - Log action.
+        - Update status to PENDING.
+        - Enqueue job.
+        - Return 202.
+6.  Add integration tests in `apps/api/src/__tests__/routes/replay.test.ts` (new file).
