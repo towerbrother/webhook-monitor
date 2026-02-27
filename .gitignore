@@ -40,5 +40,9 @@ yarn-error.log*
 # OpenCode
 .opencode
 
+# Ralph execution logs
+logs/
+*.log
+
 # Next.js
 next-env.d.ts
