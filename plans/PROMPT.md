@@ -120,16 +120,47 @@ In @plans/prd.json, update ONLY the `passes` field for your feature:
 
 ## 8. Document Your Progress
 
-Append to @plans/progress.txt following the template structure:
+**CRITICAL: progress.txt is an APPEND-ONLY file. You must NEVER overwrite it.**
 
-- Session metadata (time, branch, working directory)
+To update progress.txt correctly:
+
+1. **Read the ENTIRE file first** using `cat plans/progress.txt` or your file read tool
+2. **Append your new SESSION block to the END** - do NOT replace existing content
+3. **Preserve ALL existing sessions** - they are the historical record of previous iterations
+
+**Correct approach:**
+
+```bash
+# Read the file first to see existing content
+cat plans/progress.txt
+
+# Then append your new session (use >> not >)
+cat >> plans/progress.txt << 'EOF'
+================================================================================
+SESSION: <date> (Iteration N)
+...
+EOF
+```
+
+**WRONG approach (DO NOT DO THIS):**
+
+```bash
+# NEVER overwrite the file like this:
+cat > plans/progress.txt << 'EOF'   # WRONG - destroys history!
+echo "..." > plans/progress.txt      # WRONG - destroys history!
+```
+
+If using a file write tool, you must include ALL existing content plus your new session.
+
+**Your new session block should include:**
+
+- Session metadata (date, iteration number, branch, feature)
 - Pre-flight check results
 - Feature selection rationale
 - Implementation steps with results
 - Gateway test results
 - Verification (lint/types/tests)
-- Completion summary
-- Notes for next session
+- Completion summary with commit hash
 
 ## 9. Commit Your Work
 

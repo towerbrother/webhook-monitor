@@ -152,7 +152,15 @@ The agent prioritizes features using these criteria:
 
 ## Progress Tracking
 
-Every iteration appends to `progress.txt` with:
+**CRITICAL: `progress.txt` is APPEND-ONLY. Never overwrite previous entries.**
+
+Every iteration MUST:
+
+1. **Read the ENTIRE file** before writing
+2. **Append** a new SESSION block to the END
+3. **Preserve ALL** existing content
+
+Each session block includes:
 
 - Session metadata (timestamp, branch, working directory)
 - Pre-flight checks (git status, test results)

@@ -185,6 +185,10 @@ chmod +x scripts/smoke-test.sh
 
 ## 8. Initialize Progress Log
 
+**CRITICAL: progress.txt is an APPEND-ONLY file.**
+
+After initialization, all future iterations MUST append to this file, never overwrite it. The file serves as the historical memory across context windows.
+
 Create `plans/progress.txt` using the template structure from `plans/progress-template.txt`:
 
 ```
