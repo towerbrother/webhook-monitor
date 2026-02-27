@@ -50,16 +50,16 @@
 
 ### Structural Weaknesses
 
-1. **Idempotency mechanism is architecturally wired but operationally disabled** — the DB constraint and queue dedup exist, but the route never reads or writes `idempotencyKey`, making the entire subsystem inert.
+1. ~~**Idempotency mechanism is architecturally wired but operationally disabled**~~ — ✅ **Resolved in Step 1 (PR #58):** Route now reads `X-Idempotency-Key` header, passes it to `Event.create`, and returns 409 on duplicate.
 2. ~~**Processor never throws**~~ — ✅ **Resolved in Step 3:** `DeliveryError` is thrown on any non-2xx response, enabling BullMQ retries.
 3. **Worker logger is not Pino** — inconsistent log format between API and worker; no structured fields, no log levels, no correlation ID support.
-4. **No request validation** — routes accept any shape of body/params. Required by `apps/api/AGENTS.md` but not implemented.
+4. ~~**No request validation**~~ — ✅ **Resolved in Step 1 (PR #58):** Zod schemas validate `endpointId` params and idempotency key length.
 5. ~~**No `Event.status` field**~~ — ✅ **Resolved in Step 2 & 3:** `EventStatus` enum, `status` field, and `DeliveryAttempt` model are implemented; processor updates state transactionally.
 
 ### Current Stage
 
-> **The system is currently at Stage 5 — HTTP Delivery complete.**  
-> Infrastructure, domain, ingestion, and delivery engine are all operational. The processor makes real HTTP calls, records `DeliveryAttempt` records, and drives the `Event` state machine. Remaining work: Pino logger in worker, correlation IDs, replay endpoint, rate limiting, HMAC verification, metrics, Dockerfiles, and load validation.
+> **Steps 1-3 COMPLETE.**
+> Ingestion with idempotency + Zod validation (PR #58), EventStatus state machine + DeliveryAttempt model (PR #59), and HTTP delivery engine with transactional state updates (PR #60) are all operational.
 
 ---
 
@@ -67,7 +67,7 @@
 
 ---
 
-## STEP 1 — Complete Ingestion: Idempotency Key Extraction + Request Validation
+## STEP 1 — Complete Ingestion: Idempotency Key Extraction + Request Validation [COMPLETED - PR #58]
 
 ### 1. Objective
 
@@ -90,14 +90,14 @@ In `apps/api/src/routes/webhooks.ts`:
 
 ### 4. Implementation Checklist
 
-- [ ] Import Zod into `routes/webhooks.ts`
-- [ ] Define `EndpointParamsSchema` validating `endpointId` as non-empty string
-- [ ] Read `req.headers['x-idempotency-key']` (optional `string | string[]`, take first value, truncate to 255)
-- [ ] Pass `idempotencyKey` to `event.create` (omit field if header absent — preserves NULL behavior)
-- [ ] Wrap `event.create` in try/catch; detect `PrismaClientKnownRequestError` with code `P2002` and fields including `idempotencyKey`
-- [ ] On P2002: query the existing event by `(projectId, idempotencyKey)` and return `409` with `{ success: true, eventId: existing.id, receivedAt: existing.receivedAt, duplicate: true }`
-- [ ] Export a helper `isIdempotencyConflict(err): boolean` from `@repo/db` alongside `isUniqueConstraintError`
-- [ ] Add/update tests in `apps/api/src/__tests__/webhooks.test.ts`: duplicate key same project → 409 with original `eventId`; duplicate key different project → 201 new event; no key → always 201
+- [x] Import Zod into `routes/webhooks.ts`
+- [x] Define `EndpointParamsSchema` validating `endpointId` as non-empty string
+- [x] Read `req.headers['x-idempotency-key']` (optional `string | string[]`, take first value, truncate to 255)
+- [x] Pass `idempotencyKey` to `event.create` (omit field if header absent — preserves NULL behavior)
+- [x] Wrap `event.create` in try/catch; detect `PrismaClientKnownRequestError` with code `P2002` and fields including `idempotencyKey`
+- [x] On P2002: query the existing event by `(projectId, idempotencyKey)` and return `409` with `{ success: true, eventId: existing.id, receivedAt: existing.receivedAt, duplicate: true }`
+- [x] Export a helper `isIdempotencyConflict(err): boolean` from `@repo/db` alongside `isUniqueConstraintError`
+- [x] Add/update tests in `apps/api/src/__tests__/webhooks.test.ts`: duplicate key same project → 409 with original `eventId`; duplicate key different project → 201 new event; no key → always 201
 
 ### 5. Invariants to Enforce
 
@@ -130,7 +130,7 @@ In `apps/api/src/routes/webhooks.ts`:
 
 ---
 
-## STEP 2 — Event Status Model (State Machine Foundation)
+## STEP 2 — Event Status Model (State Machine Foundation) [COMPLETED - PR #59]
 
 ### 1. Objective
 
@@ -160,13 +160,13 @@ In `packages/db/src/domain.ts`:
 
 ### 4. Implementation Checklist
 
-- [ ] Add `EventStatus` enum to schema
-- [ ] Add `status` field to `Event` model with `@default(PENDING)`
-- [ ] Create `DeliveryAttempt` model with all fields; FK to `Event` with `onDelete: Cascade`; index on `(eventId)`, `(projectId, eventId)`
-- [ ] Run `pnpm --filter @repo/db migrate dev --name add_delivery_status`
-- [ ] Add `canTransition` to `packages/db/src/domain.ts`
-- [ ] Add unit tests for `canTransition` covering all valid and invalid transitions
-- [ ] Verify `WebhookDeliveryJobData.attempt` in `packages/queue/src/index.ts` aligns with `DeliveryAttempt.attemptNumber`
+- [x] Add `EventStatus` enum to schema
+- [x] Add `status` field to `Event` model with `@default(PENDING)`
+- [x] Create `DeliveryAttempt` model with all fields; FK to `Event` with `onDelete: Cascade`; index on `(eventId)`, `(projectId, eventId)`
+- [x] Run `pnpm --filter @repo/db migrate dev --name add_delivery_status`
+- [x] Add `canTransition` to `packages/db/src/domain.ts`
+- [x] Add unit tests for `canTransition` covering all valid and invalid transitions
+- [x] Verify `WebhookDeliveryJobData.attempt` in `packages/queue/src/index.ts` aligns with `DeliveryAttempt.attemptNumber`
 
 ### 5. Invariants to Enforce
 
@@ -196,7 +196,7 @@ In `packages/db/src/domain.ts`:
 
 ---
 
-## STEP 3 — HTTP Delivery Engine (Processor Implementation)
+## STEP 3 — HTTP Delivery Engine (Processor Implementation) [COMPLETED - PR #60]
 
 ### 1. Objective
 
@@ -692,18 +692,18 @@ Before declaring production readiness, the system must demonstrate it can handle
 
 ### Refactor Tasks
 
-- [ ] (**Step 1**) Populate `Event.idempotencyKey` from `X-Idempotency-Key` header in `apps/api/src/routes/webhooks.ts`
-- [ ] (**Step 1**) Add Zod body/params validation to all webhook routes
+- [x] (**Step 1**) Populate `Event.idempotencyKey` from `X-Idempotency-Key` header in `apps/api/src/routes/webhooks.ts`
+- [x] (**Step 1**) Add Zod body/params validation to all webhook routes
 - [x] (**Step 3**) Add `DATABASE_URL` env var to `apps/worker/src/env.ts`
 - [ ] (**Step 4**) Replace ad-hoc worker logger with Pino instance in `apps/worker/src/index.ts`
 - [ ] (**Step 4**) Add `correlationId` to `WebhookDeliveryJobData` and thread it through ingest → queue → processor
 
 ### Remaining Capabilities
 
-- [ ] (**Step 1**) Idempotency key extraction + 409 response
-- [ ] (**Step 2**) `EventStatus` enum + `status` field on `Event` — migration
-- [ ] (**Step 2**) `DeliveryAttempt` model — migration
-- [ ] (**Step 2**) `canTransition` state machine helper + unit tests
+- [x] (**Step 1**) Idempotency key extraction + 409 response
+- [x] (**Step 2**) `EventStatus` enum + `status` field on `Event` — migration
+- [x] (**Step 2**) `DeliveryAttempt` model — migration
+- [x] (**Step 2**) `canTransition` state machine helper + unit tests
 - [x] (**Step 3**) HTTP delivery in processor (`fetch` to endpoint URL)
 - [x] (**Step 3**) `DeliveryAttempt` write + `Event.status` update in processor (transactional)
 - [x] (**Step 3**) Processor throws on non-2xx (enables BullMQ retry)
