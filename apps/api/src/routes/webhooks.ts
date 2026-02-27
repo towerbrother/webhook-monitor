@@ -13,6 +13,11 @@ const IdempotencyKeySchema = z
   .string()
   .max(255, "Idempotency key must not exceed 255 characters");
 
+const EventsQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).default(50),
+  cursor: z.string().optional(),
+});
+
 /**
  * Extract and validate idempotency key from request headers
  * Returns undefined if header is not present
@@ -160,6 +165,92 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
       // Re-throw any other error
       throw error;
     }
+  });
+
+  /**
+   * GET /webhooks/:endpointId/events
+   * List events for a specific endpoint with pagination
+   */
+  fastify.get<{
+    Params: { endpointId: string };
+    Querystring: { limit?: number; cursor?: string };
+  }>("/webhooks/:endpointId/events", async (request, reply) => {
+    // Validate params
+    const paramsValidation = EndpointParamsSchema.safeParse(request.params);
+    if (!paramsValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid endpoint ID",
+        details: paramsValidation.error.issues,
+      });
+    }
+
+    // Validate query params
+    const queryValidation = EventsQuerySchema.safeParse(request.query);
+    if (!queryValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid pagination parameters",
+        details: queryValidation.error.issues,
+      });
+    }
+
+    const { endpointId } = paramsValidation.data;
+    const { limit, cursor } = queryValidation.data;
+    const { project } = request;
+
+    // Verify endpoint belongs to the authenticated project
+    const endpoint = await fastify.prisma.webhookEndpoint.findFirst({
+      where: {
+        id: endpointId,
+        projectId: project.id,
+      },
+    });
+
+    if (!endpoint) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message:
+          "Webhook endpoint not found or does not belong to this project",
+      });
+    }
+
+    // Fetch events
+    const events = await fastify.prisma.event.findMany({
+      take: limit + 1, // Fetch one extra to determine if there are more
+      cursor: cursor ? { id: cursor } : undefined,
+      skip: cursor ? 1 : 0, // Skip the cursor itself if present
+      where: {
+        endpointId: endpoint.id,
+        projectId: project.id,
+      },
+      orderBy: {
+        receivedAt: "desc",
+      },
+      select: {
+        id: true,
+        status: true,
+        idempotencyKey: true,
+        receivedAt: true,
+        headers: true,
+      },
+    });
+
+    const hasNextPage = events.length > limit;
+    const results = hasNextPage ? events.slice(0, limit) : events;
+    const nextCursor =
+      hasNextPage && results.length > 0
+        ? results[results.length - 1]?.id
+        : undefined;
+
+    return reply.status(200).send({
+      data: results,
+      pagination: {
+        limit,
+        nextCursor,
+        hasNextPage,
+      },
+    });
   });
 
   /**
