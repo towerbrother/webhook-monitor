@@ -12,6 +12,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROMPT_FILE="$SCRIPT_DIR/PROMPT.md"
 LOG_DIR="$PROJECT_ROOT/logs"
 LOG_FILE="$LOG_DIR/ralph-$(date +%Y%m%d-%H%M%S).log"
+ITERATION_TIMEOUT=${ITERATION_TIMEOUT:-1800}  # 30 minutes default timeout per iteration
 
 # Ensure logs directory exists
 mkdir -p "$LOG_DIR"
@@ -38,6 +39,7 @@ fi
   echo "================================================================================"
   echo "Start Time:       $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
   echo "Max Iterations:   $MAX_ITERATIONS"
+  echo "Iteration Timeout: ${ITERATION_TIMEOUT}s"
   echo "Project Root:     $PROJECT_ROOT"
   echo "Prompt File:      $PROMPT_FILE"
   echo "Log File:         $LOG_FILE"
@@ -73,8 +75,27 @@ for ((i=1; i<=MAX_ITERATIONS; i++)); do
   trap "rm -f '$ITERATION_OUTPUT'" EXIT
   
   set +e  # Temporarily disable exit-on-error to capture failures
-  opencode run "@$PROMPT_FILE" 2>&1 | tee "$ITERATION_OUTPUT" | tee -a "$LOG_FILE"
-  exit_code=${PIPESTATUS[0]}
+  # Run with timeout to prevent hanging indefinitely
+  if command -v timeout &> /dev/null; then
+    timeout "$ITERATION_TIMEOUT" opencode run "@$PROMPT_FILE" 2>&1 | tee "$ITERATION_OUTPUT" | tee -a "$LOG_FILE"
+    exit_code=${PIPESTATUS[0]}
+    # timeout returns 124 on timeout
+    if [ $exit_code -eq 124 ]; then
+      {
+        echo ""
+        echo "WARNING: Iteration timed out after ${ITERATION_TIMEOUT}s"
+        echo "Next iteration will attempt recovery..."
+        echo ""
+      } | tee -a "$LOG_FILE"
+      FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
+      rm -f "$ITERATION_OUTPUT"
+      continue
+    fi
+  else
+    # Fallback for systems without timeout command (e.g., some macOS)
+    opencode run "@$PROMPT_FILE" 2>&1 | tee "$ITERATION_OUTPUT" | tee -a "$LOG_FILE"
+    exit_code=${PIPESTATUS[0]}
+  fi
   set -e
   
   # Process exits here, freeing all context for the next iteration
@@ -87,12 +108,13 @@ for ((i=1; i<=MAX_ITERATIONS; i++)); do
   if [ $exit_code -ne 0 ]; then
     {
       echo ""
-      echo "ERROR: OpenCode failed with exit code $exit_code"
-      echo "Stopping Ralph loop."
+      echo "WARNING: OpenCode failed with exit code $exit_code"
+      echo "Next iteration will attempt recovery..."
       echo ""
     } | tee -a "$LOG_FILE"
     FAILED_ITERATIONS=$((FAILED_ITERATIONS + 1))
-    break
+    # Continue to next iteration - the agent will detect and recover from the failure
+    continue
   fi
   
   SUCCESSFUL_ITERATIONS=$((SUCCESSFUL_ITERATIONS + 1))
@@ -155,13 +177,13 @@ SECONDS=$((TOTAL_DURATION % 60))
 } | tee -a "$LOG_FILE"
 
 # Exit with appropriate code
-if [ $FAILED_ITERATIONS -gt 0 ]; then
-  echo "Exiting with failure (errors occurred)" >&2
-  exit 1
-elif [[ "$result" == *"<promise>COMPLETE</promise>"* ]]; then
+if [[ "${result:-}" == *"<promise>COMPLETE</promise>"* ]]; then
   echo "Exiting with success (PRD complete)"
   exit 0
+elif [ $FAILED_ITERATIONS -gt 0 ] && [ $SUCCESSFUL_ITERATIONS -eq 0 ]; then
+  echo "Exiting with failure (all iterations failed)" >&2
+  exit 1
 else
-  echo "Reached max iterations ($MAX_ITERATIONS) without completion"
+  echo "Reached max iterations ($MAX_ITERATIONS) - $SUCCESSFUL_ITERATIONS successful, $FAILED_ITERATIONS failed"
   exit 2
 fi
