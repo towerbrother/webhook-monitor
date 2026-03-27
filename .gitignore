@@ -46,3 +46,6 @@ logs/
 
 # Next.js
 next-env.d.ts
+
+# Claude
+.claude/settings.local.json
