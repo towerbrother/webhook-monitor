@@ -1,6 +1,5 @@
-import pino from "pino";
+import pino, { type DestinationStream } from "pino";
 import type { Env } from "./env.js";
-import type { DestinationStream } from "pino";
 
 export function createLogger(env: Env, destination?: DestinationStream) {
   const isDevelopment = env.NODE_ENV === "development";

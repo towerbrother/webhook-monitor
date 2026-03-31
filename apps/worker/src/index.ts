@@ -68,7 +68,10 @@ async function main() {
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
-    logger.info({ signal }, "Received shutdown signal, shutting down gracefully");
+    logger.info(
+      { signal },
+      "Received shutdown signal, shutting down gracefully"
+    );
     await worker.close();
     await prisma.$disconnect();
     logger.info("Worker stopped");
@@ -90,6 +93,9 @@ async function main() {
 }
 
 main().catch((err) => {
-  logger.error({ error: err.message, stack: err.stack }, "Worker failed to start");
+  logger.error(
+    { error: err.message, stack: err.stack },
+    "Worker failed to start"
+  );
   process.exit(1);
 });
