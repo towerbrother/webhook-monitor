@@ -3,23 +3,21 @@ import { APP_NAME } from "@repo/shared";
 import { createPrismaClient } from "@repo/db";
 import { validateEnv } from "./env.js";
 import { processWebhookDelivery } from "./processor.js";
+import { createLogger } from "./logger.js";
 
 const env = validateEnv();
-
-// Simple console logger (Step 7 will add Pino)
-const logger = {
-  info: (obj: Record<string, unknown>, msg: string) =>
-    console.log(JSON.stringify({ level: "info", msg, ...obj })),
-  error: (obj: Record<string, unknown>, msg: string) =>
-    console.error(JSON.stringify({ level: "error", msg, ...obj })),
-};
+const logger = createLogger(env);
 
 async function main() {
-  console.log(`
-╔════════════════════════════════════════════╗
-║  🔧 ${APP_NAME.toUpperCase()} WORKER STARTING...      ║
-╚════════════════════════════════════════════╝
-  `);
+  logger.info(
+    {
+      appName: APP_NAME,
+      redisHost: env.REDIS_HOST,
+      redisPort: env.REDIS_PORT,
+      queue: QUEUE_NAMES.WEBHOOK_DELIVERY,
+    },
+    "Worker starting"
+  );
 
   // Initialise Prisma client (connected lazily on first query)
   const prisma = createPrismaClient();
@@ -42,7 +40,7 @@ async function main() {
 
   // Worker event handlers
   worker.on("ready", () => {
-    logger.info({}, "Worker is ready and listening for jobs");
+    logger.info("Worker is ready and listening for jobs");
   });
 
   worker.on("completed", (job) => {
@@ -70,27 +68,28 @@ async function main() {
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
-    console.log(`\n📴 Received ${signal}, shutting down gracefully...`);
+    logger.info({ signal }, "Received shutdown signal, shutting down gracefully");
     await worker.close();
     await prisma.$disconnect();
-    console.log("👋 Worker stopped");
+    logger.info("Worker stopped");
     process.exit(0);
   };
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 
-  console.log(`
-╔════════════════════════════════════════════╗
-║  ✅ ${APP_NAME.toUpperCase()} WORKER READY            ║
-║  📡 Redis: ${env.REDIS_HOST}:${env.REDIS_PORT}                    ║
-║  📋 Queue: ${QUEUE_NAMES.WEBHOOK_DELIVERY}           ║
-║  ⏳ Processing jobs...                     ║
-╚════════════════════════════════════════════╝
-  `);
+  logger.info(
+    {
+      appName: APP_NAME,
+      redisHost: env.REDIS_HOST,
+      redisPort: env.REDIS_PORT,
+      queue: QUEUE_NAMES.WEBHOOK_DELIVERY,
+    },
+    "Worker ready and processing jobs"
+  );
 }
 
 main().catch((err) => {
-  console.error("❌ Worker failed to start:", err);
+  logger.error({ error: err.message, stack: err.stack }, "Worker failed to start");
   process.exit(1);
 });

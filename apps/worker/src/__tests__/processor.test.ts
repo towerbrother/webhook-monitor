@@ -36,9 +36,22 @@ function createMockJob(
 
 function createMockLogger(): ProcessorContext["logger"] {
   return {
+    level: "info",
     info: vi.fn(),
     error: vi.fn(),
-  };
+    warn: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+    trace: vi.fn(),
+    silent: vi.fn(),
+    child: vi.fn(),
+    bindings: vi.fn(() => ({})),
+    flush: vi.fn(),
+    isLevelEnabled: vi.fn(() => true),
+    levelVal: 30,
+    setBindings: vi.fn(),
+    onChild: vi.fn(),
+  } as unknown as ProcessorContext["logger"];
 }
 
 function createMockPrisma(eventStatus = "PENDING"): ProcessorContext["prisma"] {

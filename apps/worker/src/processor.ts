@@ -1,11 +1,9 @@
 import type { Job, WebhookDeliveryJobData } from "@repo/queue";
 import { EventStatus, canTransition, type PrismaClient } from "@repo/db";
+import type { Logger } from "./logger.js";
 
 export interface ProcessorContext {
-  logger: {
-    info: (obj: Record<string, unknown>, msg: string) => void;
-    error: (obj: Record<string, unknown>, msg: string) => void;
-  };
+  logger: Logger;
   prisma: PrismaClient;
 }
 
