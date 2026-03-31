@@ -64,6 +64,7 @@ describe("Worker Integration", () => {
       headers: {},
       body: null,
       attempt: 1,
+      correlationId: "test-correlation-integration",
     };
 
     await enqueueWebhookDelivery(queue, jobData);
@@ -110,6 +111,7 @@ describe("Worker Integration", () => {
         headers: {},
         body: null,
         attempt: 1,
+        correlationId: `test-correlation-${i}`,
       });
     }
 
@@ -138,6 +140,7 @@ describe("Worker Integration", () => {
       headers: {},
       body: null,
       attempt: 1,
+      correlationId: "test-correlation-persisted",
     });
 
     // Verify job is waiting
@@ -206,6 +209,7 @@ describe("Worker Integration", () => {
         array: [{ a: 1 }, { b: 2 }],
       },
       attempt: 2,
+      correlationId: "test-correlation-complex",
     };
 
     await enqueueWebhookDelivery(queue, complexJobData);

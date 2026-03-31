@@ -49,6 +49,7 @@ describe("Webhook Delivery Queue", () => {
         headers: { "content-type": "application/json" },
         body: { test: true },
         attempt: 1,
+        correlationId: "test-correlation-123",
       };
 
       const jobId = await enqueueWebhookDelivery(queue, jobData);
@@ -70,6 +71,7 @@ describe("Webhook Delivery Queue", () => {
         headers: {},
         body: null,
         attempt: 1,
+        correlationId: "test-correlation-001",
       };
 
       const jobId1 = await enqueueWebhookDelivery(queue, jobData);
@@ -103,6 +105,7 @@ describe("Webhook Delivery Queue", () => {
         headers: {},
         body: complexBody,
         attempt: 1,
+        correlationId: "test-correlation-complex",
       };
 
       await enqueueWebhookDelivery(queue, jobData);
