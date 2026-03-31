@@ -57,4 +57,27 @@ describe("createLogger", () => {
     const bindings = logger.bindings();
     expect(bindings.service).toBe("worker");
   });
+
+  it("should redact signingSecret fields from logged objects", () => {
+    const logger = createLogger({ ...mockEnv, NODE_ENV: "production" });
+
+    // Create a writable stream to capture the log output
+    const logs: string[] = [];
+    logger.on("data", (chunk) => {
+      logs.push(chunk.toString());
+    });
+
+    // Log an object containing signingSecret
+    const endpoint = {
+      id: "endpoint-123",
+      url: "https://example.com/webhook",
+      signingSecret: "super-secret-key",
+    };
+
+    logger.info({ endpoint }, "test message");
+
+    // Verify the output doesn't contain the secret
+    const logOutput = logs.join("");
+    expect(logOutput).not.toContain("super-secret-key");
+  });
 });
