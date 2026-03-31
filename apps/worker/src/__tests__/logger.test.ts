@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { createLogger } from "../logger.js";
 import type { Env } from "../env.js";
+import Stream from "stream";
 
 describe("createLogger", () => {
   const mockEnv: Env = {
@@ -59,13 +60,20 @@ describe("createLogger", () => {
   });
 
   it("should redact signingSecret fields from logged objects", () => {
-    const logger = createLogger({ ...mockEnv, NODE_ENV: "production" });
-
     // Create a writable stream to capture the log output
-    const logs: string[] = [];
-    logger.on("data", (chunk) => {
-      logs.push(chunk.toString());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logs: any[] = [];
+    const stream = new Stream.Writable({
+      write(chunk: Buffer, _encoding, callback) {
+        logs.push(JSON.parse(chunk.toString()));
+        callback();
+      },
     });
+
+    const prodLogger = createLogger(
+      { ...mockEnv, NODE_ENV: "production" },
+      stream
+    );
 
     // Log an object containing signingSecret
     const endpoint = {
@@ -74,10 +82,12 @@ describe("createLogger", () => {
       signingSecret: "super-secret-key",
     };
 
-    logger.info({ endpoint }, "test message");
+    prodLogger.info({ endpoint }, "test message");
 
     // Verify the output doesn't contain the secret
-    const logOutput = logs.join("");
+    const logOutput = JSON.stringify(logs);
     expect(logOutput).not.toContain("super-secret-key");
+    expect(logs[0].endpoint.id).toBe("endpoint-123");
+    expect(logs[0].endpoint.signingSecret).toBeUndefined();
   });
 });
