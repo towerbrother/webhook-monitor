@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { createLogger } from "../logger.js";
 import type { Env } from "../env.js";
+import Stream from "stream";
 
 describe("createLogger", () => {
   const mockEnv: Env = {
@@ -56,5 +57,37 @@ describe("createLogger", () => {
     // Pino's bindings() method returns the base context
     const bindings = logger.bindings();
     expect(bindings.service).toBe("worker");
+  });
+
+  it("should redact signingSecret fields from logged objects", () => {
+    // Create a writable stream to capture the log output
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logs: any[] = [];
+    const stream = new Stream.Writable({
+      write(chunk: Buffer, _encoding, callback) {
+        logs.push(JSON.parse(chunk.toString()));
+        callback();
+      },
+    });
+
+    const prodLogger = createLogger(
+      { ...mockEnv, NODE_ENV: "production" },
+      stream
+    );
+
+    // Log an object containing signingSecret
+    const endpoint = {
+      id: "endpoint-123",
+      url: "https://example.com/webhook",
+      signingSecret: "super-secret-key",
+    };
+
+    prodLogger.info({ endpoint }, "test message");
+
+    // Verify the output doesn't contain the secret
+    const logOutput = JSON.stringify(logs);
+    expect(logOutput).not.toContain("super-secret-key");
+    expect(logs[0].endpoint.id).toBe("endpoint-123");
+    expect(logs[0].endpoint.signingSecret).toBeUndefined();
   });
 });
