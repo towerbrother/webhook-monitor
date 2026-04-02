@@ -22,7 +22,7 @@
     "test": {
       "dependsOn": ["^test"],
       "cache": false,
-      "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT"]
+      "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "LOG_LEVEL"]
     }
   }
 }

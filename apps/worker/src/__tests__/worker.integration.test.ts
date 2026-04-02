@@ -15,7 +15,12 @@ import {
 import { createPrismaClient, EventStatus, type PrismaClient } from "@repo/db";
 import { processWebhookDelivery } from "../processor.js";
 import { createLogger } from "../logger.js";
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type Server,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 
 describe("Worker Integration", () => {
   let queue: Queue<WebhookDeliveryJobData>;
