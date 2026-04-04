@@ -27,7 +27,7 @@ export function makeRateLimitStoreClass(
   redis: Redis,
   timeWindow: number,
   failOpen: boolean,
-  fallbackMax: number
+  _fallbackMax: number
 ) {
   const inMemory = new Map<string, InMemoryEntry>();
 
