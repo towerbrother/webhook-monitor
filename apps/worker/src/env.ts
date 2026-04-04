@@ -16,6 +16,13 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
+  METRICS_PORT: z
+    .string()
+    .default("9091")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0 && val < 65536, {
+      message: "METRICS_PORT must be a valid port number (1-65535)",
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;

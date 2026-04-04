@@ -14,6 +14,7 @@ describe("createLogger", () => {
     REDIS_PORT: 6379,
     NODE_ENV: "test",
     LOG_LEVEL: "info",
+    METRICS_PORT: 9091,
   };
 
   it("should create a logger with all required methods", () => {

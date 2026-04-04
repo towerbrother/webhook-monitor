@@ -37,6 +37,7 @@ async function main() {
     rateLimitMax: env.RATE_LIMIT_MAX,
     rateLimitWindowMs: env.RATE_LIMIT_WINDOW_MS,
     rateLimitFailOpen: env.RATE_LIMIT_FAIL_OPEN,
+    metricsAuthToken: env.METRICS_AUTH_TOKEN,
     logger: {
       level: "info",
       transport: {

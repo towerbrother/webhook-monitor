@@ -1,5 +1,6 @@
+import http from "node:http";
 import { Worker, QUEUE_NAMES, type WebhookDeliveryJobData } from "@repo/queue";
-import { APP_NAME } from "@repo/shared";
+import { APP_NAME, registry } from "@repo/shared";
 import { createPrismaClient } from "@repo/db";
 import { validateEnv } from "./env.js";
 import { processWebhookDelivery } from "./processor.js";
@@ -66,12 +67,32 @@ async function main() {
     logger.error({ error: err.message }, "Worker error");
   });
 
+  // Minimal HTTP server for Prometheus metrics scraping
+  const metricsServer = http.createServer(async (req, res) => {
+    if (req.method === "GET" && req.url === "/metrics") {
+      const output = await registry.metrics();
+      res.writeHead(200, { "Content-Type": registry.contentType });
+      res.end(output);
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+
+  metricsServer.listen(env.METRICS_PORT, () => {
+    logger.info(
+      { port: env.METRICS_PORT },
+      "Metrics server listening"
+    );
+  });
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(
       { signal },
       "Received shutdown signal, shutting down gracefully"
     );
+    metricsServer.close();
     await worker.close();
     await prisma.$disconnect();
     logger.info("Worker stopped");

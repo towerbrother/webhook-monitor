@@ -325,6 +325,7 @@ describe("Worker Integration with Database", () => {
       REDIS_PORT: parseInt(process.env.REDIS_PORT ?? "6379", 10),
       NODE_ENV: "test",
       LOG_LEVEL: "fatal",
+      METRICS_PORT: 9091,
     });
     const worker = new Worker<WebhookDeliveryJobData>(
       QUEUE_NAMES.WEBHOOK_DELIVERY,
@@ -435,6 +436,7 @@ describe("Worker Integration with Database", () => {
       REDIS_PORT: parseInt(process.env.REDIS_PORT ?? "6379", 10),
       NODE_ENV: "test",
       LOG_LEVEL: "fatal",
+      METRICS_PORT: 9091,
     });
     const worker = new Worker<WebhookDeliveryJobData>(
       QUEUE_NAMES.WEBHOOK_DELIVERY,

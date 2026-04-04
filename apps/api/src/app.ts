@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { PrismaClient } from "@repo/db";
 import type { Queue, WebhookDeliveryJobData } from "@repo/queue";
-import { APP_NAME, type HealthCheckResponse } from "@repo/shared";
+import { APP_NAME, type HealthCheckResponse, registry } from "@repo/shared";
 import type { Redis } from "ioredis";
 import { webhookRoutes } from "./routes/webhooks.js";
 
@@ -14,6 +14,8 @@ export interface AppOptions {
   rateLimitMax?: number;
   rateLimitWindowMs?: number;
   rateLimitFailOpen?: boolean;
+  /** Optional bearer token to protect GET /metrics. If omitted, endpoint is open. */
+  metricsAuthToken?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     rateLimitMax = 100,
     rateLimitWindowMs = 60_000,
     rateLimitFailOpen = false,
+    metricsAuthToken,
   } = options;
 
   const fastify = Fastify({
@@ -45,6 +48,25 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       timestamp: new Date().toISOString(),
       service: `${APP_NAME}-api`,
     };
+  });
+
+  // Prometheus metrics endpoint — registered before webhookRoutes so it is
+  // excluded from project authentication and rate limiting.
+  fastify.get("/metrics", async (request, reply) => {
+    if (metricsAuthToken) {
+      const auth = request.headers["authorization"];
+      if (auth !== `Bearer ${metricsAuthToken}`) {
+        return reply
+          .status(401)
+          .send({ error: "Unauthorized", message: "Invalid or missing token" });
+      }
+    }
+
+    const output = await registry.metrics();
+    return reply
+      .status(200)
+      .header("Content-Type", registry.contentType)
+      .send(output);
   });
 
   // Register webhook routes (rate limiting is applied inside this plugin,

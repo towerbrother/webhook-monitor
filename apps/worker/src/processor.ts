@@ -1,5 +1,6 @@
 import type { Job, WebhookDeliveryJobData } from "@repo/queue";
 import { EventStatus, canTransition, type PrismaClient } from "@repo/db";
+import { deliveryAttemptsTotal, deliveryDurationMs } from "@repo/shared";
 import type { Logger } from "./logger.js";
 
 export interface ProcessorContext {
@@ -149,6 +150,15 @@ export async function processWebhookDelivery(
     // Re-throw so BullMQ retries the job
     throw dbError;
   }
+
+  // ── Record Prometheus metrics ─────────────────────────────────────────────
+  const durationMs = respondedAt!.getTime() - requestedAt.getTime();
+  const successLabel = success ? "true" : "false";
+  deliveryAttemptsTotal.inc({ project_id: projectId, success: successLabel });
+  deliveryDurationMs.observe(
+    { project_id: projectId, success: successLabel },
+    durationMs
+  );
 
   if (success) {
     logger.info(

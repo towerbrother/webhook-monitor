@@ -18,5 +18,8 @@
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^24.10.13",
     "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "prom-client": "^15.1.3"
   }
 }

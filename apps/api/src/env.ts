@@ -41,6 +41,7 @@ const envSchema = z.object({
     .string()
     .default("false")
     .transform((val) => val === "true"),
+  METRICS_AUTH_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

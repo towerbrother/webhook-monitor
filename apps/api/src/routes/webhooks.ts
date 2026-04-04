@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Prisma, isIdempotencyConflict } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
 import { enqueueWebhookDelivery } from "@repo/queue";
+import { eventsReceivedTotal } from "@repo/shared";
 import { z } from "zod";
 import type { Redis } from "ioredis";
 import fastifyRateLimit from "@fastify/rate-limit";
@@ -171,6 +172,8 @@ export async function webhookRoutes(
           "Failed to enqueue webhook delivery"
         );
       });
+
+      eventsReceivedTotal.inc({ project_id: project.id });
 
       return reply.status(201).send({
         success: true,
