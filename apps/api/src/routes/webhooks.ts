@@ -3,6 +3,16 @@ import { Prisma, isIdempotencyConflict } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
 import { enqueueWebhookDelivery } from "@repo/queue";
 import { z } from "zod";
+import type { Redis } from "ioredis";
+import fastifyRateLimit from "@fastify/rate-limit";
+import { makeRateLimitStoreClass } from "../plugins/redis-rate-limit-store.js";
+
+export interface WebhookRouteOptions {
+  redis?: Redis;
+  rateLimitMax: number;
+  rateLimitWindowMs: number;
+  rateLimitFailOpen: boolean;
+}
 
 // Validation schemas
 const EndpointParamsSchema = z.object({
@@ -41,9 +51,41 @@ function extractIdempotencyKey(
  * Webhook ingestion routes
  * All routes require project authentication via X-Project-Key header
  */
-export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
-  // Apply authentication middleware to all webhook routes
+export async function webhookRoutes(
+  fastify: FastifyInstance,
+  options: WebhookRouteOptions
+): Promise<void> {
+  // Apply authentication middleware first so req.project is available
+  // for the rate-limit keyGenerator registered below
   fastify.addHook("preHandler", authenticateProject);
+
+  // Rate limiting — registered after auth so req.project is populated.
+  // /health is outside this plugin scope and is never rate-limited.
+  if (options.redis) {
+    const { rateLimitMax, rateLimitWindowMs, rateLimitFailOpen } = options;
+    const StoreClass = makeRateLimitStoreClass(
+      options.redis,
+      rateLimitWindowMs,
+      rateLimitFailOpen,
+      Math.floor(rateLimitMax / 10)
+    );
+
+    await fastify.register(fastifyRateLimit, {
+      // Store is built as a class; cast required because the closure-based
+      // class constructor signature differs from the generic ctor type.
+      store: StoreClass as unknown as import("@fastify/rate-limit").FastifyRateLimitStoreCtor,
+      // Run as preHandler so auth has already set req.project before this
+      // executes — the default onRequest hook runs before authentication.
+      hook: "preHandler",
+      timeWindow: rateLimitWindowMs,
+      max: (req, _key) =>
+        req.project
+          ? rateLimitMax
+          : Math.max(1, Math.floor(rateLimitMax / 10)),
+      keyGenerator: (req) =>
+        req.project?.id ?? `unauthenticated:${req.ip ?? "unknown"}`,
+    });
+  }
 
   /**
    * POST /webhooks/:endpointId
