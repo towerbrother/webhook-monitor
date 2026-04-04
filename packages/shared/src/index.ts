@@ -3,8 +3,6 @@
  * This package is used to verify monorepo wiring works correctly
  */
 
-export * from "./metrics.js";
-
 // Application name constant
 export const APP_NAME = "webhook-monitor" as const;
 

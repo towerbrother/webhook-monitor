@@ -1,6 +1,7 @@
 import http from "node:http";
 import { Worker, QUEUE_NAMES, type WebhookDeliveryJobData } from "@repo/queue";
-import { APP_NAME, registry } from "@repo/shared";
+import { APP_NAME } from "@repo/shared";
+import { registry } from "@repo/shared/metrics";
 import { createPrismaClient } from "@repo/db";
 import { validateEnv } from "./env.js";
 import { processWebhookDelivery } from "./processor.js";

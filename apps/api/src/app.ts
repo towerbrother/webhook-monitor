@@ -1,7 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { PrismaClient } from "@repo/db";
 import type { Queue, WebhookDeliveryJobData } from "@repo/queue";
-import { APP_NAME, type HealthCheckResponse, registry } from "@repo/shared";
+import { APP_NAME, type HealthCheckResponse } from "@repo/shared";
+import { registry } from "@repo/shared/metrics";
 import type { Redis } from "ioredis";
 import { webhookRoutes } from "./routes/webhooks.js";
 

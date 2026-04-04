@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Prisma, isIdempotencyConflict } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
 import { enqueueWebhookDelivery } from "@repo/queue";
-import { eventsReceivedTotal } from "@repo/shared";
+import { eventsReceivedTotal } from "@repo/shared/metrics";
 import { z } from "zod";
 import type { Redis } from "ioredis";
 import fastifyRateLimit from "@fastify/rate-limit";

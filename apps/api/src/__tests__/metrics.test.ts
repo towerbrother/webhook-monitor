@@ -19,7 +19,7 @@ import {
   type WebhookDeliveryJobData,
 } from "@repo/queue";
 import { createTestProject, createTestEndpoint } from "@repo/db/testing";
-import { registry } from "@repo/shared";
+import { registry } from "@repo/shared/metrics";
 
 const skipTests = !process.env.DATABASE_URL;
 
