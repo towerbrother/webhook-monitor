@@ -73,15 +73,14 @@ export async function webhookRoutes(
     await fastify.register(fastifyRateLimit, {
       // Store is built as a class; cast required because the closure-based
       // class constructor signature differs from the generic ctor type.
-      store: StoreClass as unknown as import("@fastify/rate-limit").FastifyRateLimitStoreCtor,
+      store:
+        StoreClass as unknown as import("@fastify/rate-limit").FastifyRateLimitStoreCtor,
       // Run as preHandler so auth has already set req.project before this
       // executes — the default onRequest hook runs before authentication.
       hook: "preHandler",
       timeWindow: rateLimitWindowMs,
       max: (req, _key) =>
-        req.project
-          ? rateLimitMax
-          : Math.max(1, Math.floor(rateLimitMax / 10)),
+        req.project ? rateLimitMax : Math.max(1, Math.floor(rateLimitMax / 10)),
       keyGenerator: (req) =>
         req.project?.id ?? `unauthenticated:${req.ip ?? "unknown"}`,
     });
