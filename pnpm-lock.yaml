@@ -74,7 +74,7 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
       vitest:
-        specifier: ^4.1.2
+        specifier: ^4.1.4
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.10.13)(@vitest/coverage-v8@4.1.4)(vite@7.3.1(@types/node@24.10.13)(jiti@2.6.1)(tsx@4.21.0))
 
   apps/web:
@@ -154,7 +154,7 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
       vitest:
-        specifier: ^4.1.2
+        specifier: ^4.1.4
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.10.13)(@vitest/coverage-v8@4.1.4)(vite@7.3.1(@types/node@24.10.13)(jiti@2.6.1)(tsx@4.21.0))
 
   packages/db:
@@ -188,7 +188,7 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
       vitest:
-        specifier: ^4.1.2
+        specifier: ^4.1.4
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.10.13)(@vitest/coverage-v8@4.1.4)(vite@7.3.1(@types/node@24.10.13)(jiti@2.6.1)(tsx@4.21.0))
 
   packages/eslint-config:
@@ -249,7 +249,7 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
       vitest:
-        specifier: ^4.1.2
+        specifier: ^4.1.4
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@24.10.13)(@vitest/coverage-v8@4.1.4)(vite@7.3.1(@types/node@24.10.13)(jiti@2.6.1)(tsx@4.21.0))
 
   packages/shared:
