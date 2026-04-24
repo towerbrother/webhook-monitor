@@ -76,14 +76,12 @@ describe("Worker Integration", () => {
       correlationId: "test-correlation-integration",
     };
 
-    await enqueueWebhookDelivery(queue, jobData);
-
-    // Wait for job to be processed
-    await new Promise<void>((resolve) => {
-      worker.on("completed", () => {
-        resolve();
-      });
+    const completionPromise = new Promise<void>((resolve) => {
+      worker.on("completed", () => resolve());
     });
+
+    await enqueueWebhookDelivery(queue, jobData);
+    await completionPromise;
 
     // Verify job was processed
     expect(processedJobs).toContain("integration-test-event");
@@ -109,6 +107,14 @@ describe("Worker Integration", () => {
       }
     );
 
+    const completionPromise = new Promise<void>((resolve) => {
+      let completed = 0;
+      worker.on("completed", () => {
+        completed++;
+        if (completed === 3) resolve();
+      });
+    });
+
     // Enqueue multiple jobs
     for (let i = 1; i <= 3; i++) {
       await enqueueWebhookDelivery(queue, {
@@ -124,14 +130,7 @@ describe("Worker Integration", () => {
       });
     }
 
-    // Wait for all jobs
-    await new Promise<void>((resolve) => {
-      let completed = 0;
-      worker.on("completed", () => {
-        completed++;
-        if (completed === 3) resolve();
-      });
-    });
+    await completionPromise;
 
     expect(processedOrder).toEqual(["event-1", "event-2", "event-3"]);
 
@@ -221,12 +220,12 @@ describe("Worker Integration", () => {
       correlationId: "test-correlation-complex",
     };
 
-    await enqueueWebhookDelivery(queue, complexJobData);
-
-    // Wait for job to be processed
-    await new Promise<void>((resolve) => {
+    const completionPromise = new Promise<void>((resolve) => {
       worker.on("completed", () => resolve());
     });
+
+    await enqueueWebhookDelivery(queue, complexJobData);
+    await completionPromise;
 
     expect(processedData).toHaveLength(1);
     expect(processedData[0]).toEqual(complexJobData);
@@ -340,6 +339,10 @@ describe("Worker Integration with Database", () => {
       }
     );
 
+    const completionPromise = new Promise<void>((resolve) => {
+      worker.on("completed", () => resolve());
+    });
+
     // Enqueue job pointing to mock server
     await enqueueWebhookDelivery(queue, {
       eventId: event.id,
@@ -353,10 +356,7 @@ describe("Worker Integration with Database", () => {
       correlationId: "test-correlation-success",
     });
 
-    // Wait for job completion
-    await new Promise<void>((resolve) => {
-      worker.on("completed", () => resolve());
-    });
+    await completionPromise;
 
     // Verify mock server received request
     expect(requestReceived).toBe(true);
@@ -450,6 +450,10 @@ describe("Worker Integration with Database", () => {
       }
     );
 
+    const failurePromise = new Promise<void>((resolve) => {
+      worker.on("failed", () => resolve());
+    });
+
     // Enqueue job pointing to mock server
     await enqueueWebhookDelivery(queue, {
       eventId: event.id,
@@ -463,10 +467,7 @@ describe("Worker Integration with Database", () => {
       correlationId: "test-correlation-failure",
     });
 
-    // Wait for job to fail
-    await new Promise<void>((resolve) => {
-      worker.on("failed", () => resolve());
-    });
+    await failurePromise;
 
     // Query DeliveryAttempt via Prisma
     const deliveryAttempts = await prisma.deliveryAttempt.findMany({
