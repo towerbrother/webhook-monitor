@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { verifyWebhookSignature, signWebhookBody } from "@repo/shared";
+import { verifyWebhookSignature, signWebhookBody } from "../hmac.js";
 
 describe("verifyWebhookSignature", () => {
   const secret = "my-webhook-secret";
@@ -12,7 +12,9 @@ describe("verifyWebhookSignature", () => {
 
   it("returns false when the body has been tampered", () => {
     const sig = signWebhookBody(body, secret);
-    const tampered = Buffer.from(JSON.stringify({ event: "push", ref: "evil" }));
+    const tampered = Buffer.from(
+      JSON.stringify({ event: "push", ref: "evil" })
+    );
     expect(verifyWebhookSignature(tampered, sig, secret)).toBe(false);
   });
 
@@ -24,8 +26,7 @@ describe("verifyWebhookSignature", () => {
   it("returns false when a single bit of the signature is flipped", () => {
     const sig = signWebhookBody(body, secret);
     // Flip the last hex character
-    const flipped =
-      sig.slice(0, -1) + (sig.slice(-1) === "0" ? "1" : "0");
+    const flipped = sig.slice(0, -1) + (sig.slice(-1) === "0" ? "1" : "0");
     expect(verifyWebhookSignature(body, flipped, secret)).toBe(false);
   });
 

@@ -67,7 +67,12 @@ async function main() {
     logger.error({ error: err.message }, "Worker error");
   });
 
-  const shutdown = createShutdownHandler(worker, prisma, logger, env.SHUTDOWN_TIMEOUT_MS);
+  const shutdown = createShutdownHandler(
+    worker,
+    prisma,
+    logger,
+    env.SHUTDOWN_TIMEOUT_MS
+  );
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));

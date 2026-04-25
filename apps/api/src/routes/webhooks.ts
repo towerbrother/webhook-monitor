@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Prisma, isIdempotencyConflict, EventStatus } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
 import { enqueueWebhookDelivery } from "@repo/queue";
-import { verifyWebhookSignature } from "@repo/shared";
+import { verifyWebhookSignature } from "../hmac.js";
 import { z } from "zod";
 import type { Redis } from "ioredis";
 import fastifyRateLimit from "@fastify/rate-limit";
@@ -231,7 +231,9 @@ export async function webhookRoutes(
       Prisma.JsonNull;
     if (rawBody.length > 0) {
       try {
-        parsedBody = JSON.parse(rawBody.toString("utf8")) as Prisma.InputJsonValue;
+        parsedBody = JSON.parse(
+          rawBody.toString("utf8")
+        ) as Prisma.InputJsonValue;
       } catch {
         parsedBody = rawBody.toString("utf8") as Prisma.InputJsonValue;
       }
@@ -470,24 +472,34 @@ export async function webhookRoutes(
     if (!consumeReplayRateLimit(project.id)) {
       return reply.status(429).send({
         error: "Too Many Requests",
-        message: "Replay rate limit exceeded. Maximum 10 replays per minute per project.",
+        message:
+          "Replay rate limit exceeded. Maximum 10 replays per minute per project.",
       });
     }
 
     if (event.status === EventStatus.DELIVERED) {
-      return reply.status(200).send({ queued: false, message: "Already delivered" });
+      return reply
+        .status(200)
+        .send({ queued: false, message: "Already delivered" });
     }
 
     if (
       event.status === EventStatus.PENDING ||
       event.status === EventStatus.RETRYING
     ) {
-      return reply.status(200).send({ queued: false, message: "Already in progress" });
+      return reply
+        .status(200)
+        .send({ queued: false, message: "Already in progress" });
     }
 
     // FAILED: log, reset to PENDING, enqueue
     fastify.log.info(
-      { eventId: event.id, projectId: project.id, correlationId: request.id, action: "replay" },
+      {
+        eventId: event.id,
+        projectId: project.id,
+        correlationId: request.id,
+        action: "replay",
+      },
       "Replaying failed event"
     );
 
@@ -507,7 +519,10 @@ export async function webhookRoutes(
       attempt: 1,
       correlationId: request.id,
     }).catch((err: unknown) => {
-      fastify.log.error({ err, eventId: event.id }, "Failed to enqueue replay job");
+      fastify.log.error(
+        { err, eventId: event.id },
+        "Failed to enqueue replay job"
+      );
     });
 
     return reply.status(202).send({ queued: true, eventId: event.id });

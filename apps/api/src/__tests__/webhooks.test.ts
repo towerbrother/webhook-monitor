@@ -26,7 +26,7 @@ import {
   createTestEvent,
   createTestDeliveryAttempt,
 } from "@repo/db/testing";
-import { signWebhookBody } from "@repo/shared";
+import { signWebhookBody } from "../hmac.js";
 
 let app: FastifyInstance;
 let queue: Queue<WebhookDeliveryJobData>;

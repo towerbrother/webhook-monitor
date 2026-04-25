@@ -67,12 +67,17 @@ describe.skipIf(skipTests)("POST /endpoints", () => {
       method: "POST",
       url: "/endpoints",
       headers: { "x-project-key": project.projectKey },
-      payload: { url: "https://example.com/persist-test", name: "Persist Test" },
+      payload: {
+        url: "https://example.com/persist-test",
+        name: "Persist Test",
+      },
     });
 
     expect(response.statusCode).toBe(201);
     const body = JSON.parse(response.body);
-    const saved = await prisma.webhookEndpoint.findUnique({ where: { id: body.id } });
+    const saved = await prisma.webhookEndpoint.findUnique({
+      where: { id: body.id },
+    });
     expect(saved).not.toBeNull();
     expect(saved!.projectId).toBe(project.id);
   });
@@ -338,7 +343,9 @@ describe.skipIf(skipTests)("DELETE /endpoints/:endpointId", () => {
     });
 
     expect(response.statusCode).toBe(204);
-    const deletedEvent = await prisma.event.findUnique({ where: { id: event.id } });
+    const deletedEvent = await prisma.event.findUnique({
+      where: { id: event.id },
+    });
     expect(deletedEvent).toBeNull();
   });
 

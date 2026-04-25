@@ -9,7 +9,10 @@ export function createShutdownHandler(
   timeoutMs: number
 ) {
   return async (signal: string): Promise<void> => {
-    logger.info({ signal }, "Received shutdown signal, shutting down gracefully");
+    logger.info(
+      { signal },
+      "Received shutdown signal, shutting down gracefully"
+    );
 
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(

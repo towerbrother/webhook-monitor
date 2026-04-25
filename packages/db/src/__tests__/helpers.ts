@@ -106,9 +106,7 @@ export async function createTestDeliveryAttempt(
   prisma: PrismaClient,
   eventId: string,
   projectId: string,
-  overrides: Partial<
-    Omit<DeliveryAttempt, "id" | "eventId" | "projectId">
-  > = {}
+  overrides: Partial<Omit<DeliveryAttempt, "id" | "eventId" | "projectId">> = {}
 ): Promise<DeliveryAttempt> {
   return prisma.deliveryAttempt.create({
     data: {
