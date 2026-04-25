@@ -39,11 +39,13 @@ model Project {
 //   - URL is globally unique and immutable
 //
 model WebhookEndpoint {
-  id        String   @id @default(cuid())
-  url       String   @unique // Unique identifier (e.g., "ep_abc123")
-  name      String
-  projectId String
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  url           String   @unique // Unique identifier (e.g., "ep_abc123")
+  name          String
+  projectId     String
+  /// @sensitive - never expose in API responses or logs
+  signingSecret String?  @db.Text
+  createdAt     DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   events  Event[]

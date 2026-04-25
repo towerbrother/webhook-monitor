@@ -497,10 +497,6 @@ export type EventUncheckedUpdateManyWithoutEndpointNestedInput = {
   deleteMany?: Prisma.EventScalarWhereInput | Prisma.EventScalarWhereInput[]
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
-}
-
 export type EnumEventStatusFieldUpdateOperationsInput = {
   set?: $Enums.EventStatus
 }

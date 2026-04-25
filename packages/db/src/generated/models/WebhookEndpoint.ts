@@ -29,6 +29,7 @@ export type WebhookEndpointMinAggregateOutputType = {
   url: string | null
   name: string | null
   projectId: string | null
+  signingSecret: string | null
   createdAt: Date | null
 }
 
@@ -37,6 +38,7 @@ export type WebhookEndpointMaxAggregateOutputType = {
   url: string | null
   name: string | null
   projectId: string | null
+  signingSecret: string | null
   createdAt: Date | null
 }
 
@@ -45,6 +47,7 @@ export type WebhookEndpointCountAggregateOutputType = {
   url: number
   name: number
   projectId: number
+  signingSecret: number
   createdAt: number
   _all: number
 }
@@ -55,6 +58,7 @@ export type WebhookEndpointMinAggregateInputType = {
   url?: true
   name?: true
   projectId?: true
+  signingSecret?: true
   createdAt?: true
 }
 
@@ -63,6 +67,7 @@ export type WebhookEndpointMaxAggregateInputType = {
   url?: true
   name?: true
   projectId?: true
+  signingSecret?: true
   createdAt?: true
 }
 
@@ -71,6 +76,7 @@ export type WebhookEndpointCountAggregateInputType = {
   url?: true
   name?: true
   projectId?: true
+  signingSecret?: true
   createdAt?: true
   _all?: true
 }
@@ -152,6 +158,7 @@ export type WebhookEndpointGroupByOutputType = {
   url: string
   name: string
   projectId: string
+  signingSecret: string | null
   createdAt: Date
   _count: WebhookEndpointCountAggregateOutputType | null
   _min: WebhookEndpointMinAggregateOutputType | null
@@ -181,6 +188,7 @@ export type WebhookEndpointWhereInput = {
   url?: Prisma.StringFilter<"WebhookEndpoint"> | string
   name?: Prisma.StringFilter<"WebhookEndpoint"> | string
   projectId?: Prisma.StringFilter<"WebhookEndpoint"> | string
+  signingSecret?: Prisma.StringNullableFilter<"WebhookEndpoint"> | string | null
   createdAt?: Prisma.DateTimeFilter<"WebhookEndpoint"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
   events?: Prisma.EventListRelationFilter
@@ -191,6 +199,7 @@ export type WebhookEndpointOrderByWithRelationInput = {
   url?: Prisma.SortOrder
   name?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
+  signingSecret?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
   events?: Prisma.EventOrderByRelationAggregateInput
@@ -204,6 +213,7 @@ export type WebhookEndpointWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.WebhookEndpointWhereInput | Prisma.WebhookEndpointWhereInput[]
   name?: Prisma.StringFilter<"WebhookEndpoint"> | string
   projectId?: Prisma.StringFilter<"WebhookEndpoint"> | string
+  signingSecret?: Prisma.StringNullableFilter<"WebhookEndpoint"> | string | null
   createdAt?: Prisma.DateTimeFilter<"WebhookEndpoint"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
   events?: Prisma.EventListRelationFilter
@@ -214,6 +224,7 @@ export type WebhookEndpointOrderByWithAggregationInput = {
   url?: Prisma.SortOrder
   name?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
+  signingSecret?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.WebhookEndpointCountOrderByAggregateInput
   _max?: Prisma.WebhookEndpointMaxOrderByAggregateInput
@@ -228,6 +239,7 @@ export type WebhookEndpointScalarWhereWithAggregatesInput = {
   url?: Prisma.StringWithAggregatesFilter<"WebhookEndpoint"> | string
   name?: Prisma.StringWithAggregatesFilter<"WebhookEndpoint"> | string
   projectId?: Prisma.StringWithAggregatesFilter<"WebhookEndpoint"> | string
+  signingSecret?: Prisma.StringNullableWithAggregatesFilter<"WebhookEndpoint"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"WebhookEndpoint"> | Date | string
 }
 
@@ -235,6 +247,7 @@ export type WebhookEndpointCreateInput = {
   id?: string
   url: string
   name: string
+  signingSecret?: string | null
   createdAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutEndpointsInput
   events?: Prisma.EventCreateNestedManyWithoutEndpointInput
@@ -245,6 +258,7 @@ export type WebhookEndpointUncheckedCreateInput = {
   url: string
   name: string
   projectId: string
+  signingSecret?: string | null
   createdAt?: Date | string
   events?: Prisma.EventUncheckedCreateNestedManyWithoutEndpointInput
 }
@@ -253,6 +267,7 @@ export type WebhookEndpointUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutEndpointsNestedInput
   events?: Prisma.EventUpdateManyWithoutEndpointNestedInput
@@ -263,6 +278,7 @@ export type WebhookEndpointUncheckedUpdateInput = {
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   events?: Prisma.EventUncheckedUpdateManyWithoutEndpointNestedInput
 }
@@ -272,6 +288,7 @@ export type WebhookEndpointCreateManyInput = {
   url: string
   name: string
   projectId: string
+  signingSecret?: string | null
   createdAt?: Date | string
 }
 
@@ -279,6 +296,7 @@ export type WebhookEndpointUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -287,6 +305,7 @@ export type WebhookEndpointUncheckedUpdateManyInput = {
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -305,6 +324,7 @@ export type WebhookEndpointCountOrderByAggregateInput = {
   url?: Prisma.SortOrder
   name?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
+  signingSecret?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -313,6 +333,7 @@ export type WebhookEndpointMaxOrderByAggregateInput = {
   url?: Prisma.SortOrder
   name?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
+  signingSecret?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -321,6 +342,7 @@ export type WebhookEndpointMinOrderByAggregateInput = {
   url?: Prisma.SortOrder
   name?: Prisma.SortOrder
   projectId?: Prisma.SortOrder
+  signingSecret?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -371,6 +393,10 @@ export type WebhookEndpointUncheckedUpdateManyWithoutProjectNestedInput = {
   deleteMany?: Prisma.WebhookEndpointScalarWhereInput | Prisma.WebhookEndpointScalarWhereInput[]
 }
 
+export type NullableStringFieldUpdateOperationsInput = {
+  set?: string | null
+}
+
 export type WebhookEndpointCreateNestedOneWithoutEventsInput = {
   create?: Prisma.XOR<Prisma.WebhookEndpointCreateWithoutEventsInput, Prisma.WebhookEndpointUncheckedCreateWithoutEventsInput>
   connectOrCreate?: Prisma.WebhookEndpointCreateOrConnectWithoutEventsInput
@@ -389,6 +415,7 @@ export type WebhookEndpointCreateWithoutProjectInput = {
   id?: string
   url: string
   name: string
+  signingSecret?: string | null
   createdAt?: Date | string
   events?: Prisma.EventCreateNestedManyWithoutEndpointInput
 }
@@ -397,6 +424,7 @@ export type WebhookEndpointUncheckedCreateWithoutProjectInput = {
   id?: string
   url: string
   name: string
+  signingSecret?: string | null
   createdAt?: Date | string
   events?: Prisma.EventUncheckedCreateNestedManyWithoutEndpointInput
 }
@@ -435,6 +463,7 @@ export type WebhookEndpointScalarWhereInput = {
   url?: Prisma.StringFilter<"WebhookEndpoint"> | string
   name?: Prisma.StringFilter<"WebhookEndpoint"> | string
   projectId?: Prisma.StringFilter<"WebhookEndpoint"> | string
+  signingSecret?: Prisma.StringNullableFilter<"WebhookEndpoint"> | string | null
   createdAt?: Prisma.DateTimeFilter<"WebhookEndpoint"> | Date | string
 }
 
@@ -442,6 +471,7 @@ export type WebhookEndpointCreateWithoutEventsInput = {
   id?: string
   url: string
   name: string
+  signingSecret?: string | null
   createdAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutEndpointsInput
 }
@@ -451,6 +481,7 @@ export type WebhookEndpointUncheckedCreateWithoutEventsInput = {
   url: string
   name: string
   projectId: string
+  signingSecret?: string | null
   createdAt?: Date | string
 }
 
@@ -474,6 +505,7 @@ export type WebhookEndpointUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutEndpointsNestedInput
 }
@@ -483,6 +515,7 @@ export type WebhookEndpointUncheckedUpdateWithoutEventsInput = {
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -490,6 +523,7 @@ export type WebhookEndpointCreateManyProjectInput = {
   id?: string
   url: string
   name: string
+  signingSecret?: string | null
   createdAt?: Date | string
 }
 
@@ -497,6 +531,7 @@ export type WebhookEndpointUpdateWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   events?: Prisma.EventUpdateManyWithoutEndpointNestedInput
 }
@@ -505,6 +540,7 @@ export type WebhookEndpointUncheckedUpdateWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   events?: Prisma.EventUncheckedUpdateManyWithoutEndpointNestedInput
 }
@@ -513,6 +549,7 @@ export type WebhookEndpointUncheckedUpdateManyWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   url?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
+  signingSecret?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -552,6 +589,7 @@ export type WebhookEndpointSelect<ExtArgs extends runtime.Types.Extensions.Inter
   url?: boolean
   name?: boolean
   projectId?: boolean
+  signingSecret?: boolean
   createdAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   events?: boolean | Prisma.WebhookEndpoint$eventsArgs<ExtArgs>
@@ -563,6 +601,7 @@ export type WebhookEndpointSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   url?: boolean
   name?: boolean
   projectId?: boolean
+  signingSecret?: boolean
   createdAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["webhookEndpoint"]>
@@ -572,6 +611,7 @@ export type WebhookEndpointSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   url?: boolean
   name?: boolean
   projectId?: boolean
+  signingSecret?: boolean
   createdAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["webhookEndpoint"]>
@@ -581,10 +621,11 @@ export type WebhookEndpointSelectScalar = {
   url?: boolean
   name?: boolean
   projectId?: boolean
+  signingSecret?: boolean
   createdAt?: boolean
 }
 
-export type WebhookEndpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "name" | "projectId" | "createdAt", ExtArgs["result"]["webhookEndpoint"]>
+export type WebhookEndpointOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "name" | "projectId" | "signingSecret" | "createdAt", ExtArgs["result"]["webhookEndpoint"]>
 export type WebhookEndpointInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
   events?: boolean | Prisma.WebhookEndpoint$eventsArgs<ExtArgs>
@@ -608,6 +649,10 @@ export type $WebhookEndpointPayload<ExtArgs extends runtime.Types.Extensions.Int
     url: string
     name: string
     projectId: string
+    /**
+     * @sensitive - never expose in API responses or logs
+     */
+    signingSecret: string | null
     createdAt: Date
   }, ExtArgs["result"]["webhookEndpoint"]>
   composites: {}
@@ -1038,6 +1083,7 @@ export interface WebhookEndpointFieldRefs {
   readonly url: Prisma.FieldRef<"WebhookEndpoint", 'String'>
   readonly name: Prisma.FieldRef<"WebhookEndpoint", 'String'>
   readonly projectId: Prisma.FieldRef<"WebhookEndpoint", 'String'>
+  readonly signingSecret: Prisma.FieldRef<"WebhookEndpoint", 'String'>
   readonly createdAt: Prisma.FieldRef<"WebhookEndpoint", 'DateTime'>
 }
     
