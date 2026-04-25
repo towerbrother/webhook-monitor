@@ -79,12 +79,6 @@ async function main() {
     console.log(`        -H "Content-Type: application/json" \\`);
     console.log(`        -d '{"test": "data"}'\n`);
 
-    console.log("   Test 4 - Project-wide webhook (should return 200):");
-    console.log(`   curl -X POST http://localhost:3000/webhooks \\`);
-    console.log(`        -H "X-Project-Key: ${project.projectKey}" \\`);
-    console.log(`        -H "Content-Type: application/json" \\`);
-    console.log(`        -d '{"test": "data"}'\n`);
-
     console.log("🧹 Cleanup:");
     console.log(
       "   To remove test data, run this script again or manually delete the project.\n"
