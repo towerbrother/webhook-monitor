@@ -8,6 +8,12 @@
 import { beforeAll, afterAll, beforeEach } from "vitest";
 import { createPrismaClient, type PrismaClient } from "@repo/db";
 
+// Isolate tests on a separate Redis DB so a locally-running worker
+// (e.g. docker compose, `pnpm dev`) on db 0 cannot consume test jobs.
+process.env.REDIS_HOST = process.env.REDIS_HOST ?? "localhost";
+process.env.REDIS_PORT = process.env.REDIS_PORT ?? "6379";
+process.env.REDIS_DB = process.env.REDIS_DB ?? "1";
+
 let prisma: PrismaClient | undefined;
 
 export function getTestPrisma(): PrismaClient {

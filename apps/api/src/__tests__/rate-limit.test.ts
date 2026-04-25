@@ -60,15 +60,17 @@ beforeAll(async () => {
     redis: {
       host: process.env.REDIS_HOST ?? "localhost",
       port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+      db: parseInt(process.env.REDIS_DB ?? "0", 10),
       maxRetriesPerRequest: null,
     },
   });
   await queue.waitUntilReady();
+  await queue.obliterate({ force: true });
 });
 
 beforeEach(async () => {
   if (!queue) return;
-  await queue.drain();
+  await queue.obliterate({ force: true });
 });
 
 afterAll(async () => {
@@ -88,6 +90,7 @@ describe.skipIf(skipTests)("Rate Limiting", () => {
       const redis = new Redis({
         host: process.env.REDIS_HOST ?? "localhost",
         port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
       });
 
       // Use a low limit so the test doesn't need 100+ requests
@@ -137,6 +140,7 @@ describe.skipIf(skipTests)("Rate Limiting", () => {
       const redis = new Redis({
         host: process.env.REDIS_HOST ?? "localhost",
         port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
       });
 
       const rateLimitMax = 3;

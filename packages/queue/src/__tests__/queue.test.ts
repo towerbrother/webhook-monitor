@@ -23,14 +23,16 @@ describe("Webhook Delivery Queue", () => {
       redis: {
         host: process.env.REDIS_HOST ?? "localhost",
         port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
         maxRetriesPerRequest: null,
       },
     });
     await queue.waitUntilReady();
+    await queue.obliterate({ force: true });
   });
 
   beforeEach(async () => {
-    await queue.drain();
+    await queue.obliterate({ force: true });
   });
 
   afterAll(async () => {
@@ -118,12 +120,14 @@ describe("Webhook Delivery Queue", () => {
 
   describe("createWebhookDeliveryQueue", () => {
     it("should create independent queue instances", async () => {
-      const queue1 = createWebhookDeliveryQueue({
-        redis: { host: "localhost", port: 6379, maxRetriesPerRequest: null },
-      });
-      const queue2 = createWebhookDeliveryQueue({
-        redis: { host: "localhost", port: 6379, maxRetriesPerRequest: null },
-      });
+      const redisOpts = {
+        host: process.env.REDIS_HOST ?? "localhost",
+        port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
+        maxRetriesPerRequest: null,
+      };
+      const queue1 = createWebhookDeliveryQueue({ redis: redisOpts });
+      const queue2 = createWebhookDeliveryQueue({ redis: redisOpts });
 
       expect(queue1).not.toBe(queue2);
 

@@ -30,14 +30,18 @@ describe("Worker Integration", () => {
       redis: {
         host: process.env.REDIS_HOST ?? "localhost",
         port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
         maxRetriesPerRequest: null,
       },
     });
     await queue.waitUntilReady();
+    // Obliterate any leftover state from a previous (possibly failed) run
+    // so jobId-based deduplication doesn't keep new adds out of "waiting".
+    await queue.obliterate({ force: true });
   });
 
   beforeEach(async () => {
-    await queue.drain();
+    await queue.obliterate({ force: true });
   });
 
   afterAll(async () => {
@@ -58,6 +62,7 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
@@ -101,6 +106,7 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
         concurrency: 1, // Process one at a time for order guarantee
@@ -166,6 +172,7 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
@@ -193,6 +200,7 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
@@ -246,10 +254,12 @@ describe("Worker Integration with Database", () => {
       redis: {
         host: process.env.REDIS_HOST ?? "localhost",
         port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
         maxRetriesPerRequest: null,
       },
     });
     await queue.waitUntilReady();
+    await queue.obliterate({ force: true });
 
     // Initialize Prisma
     prisma = createPrismaClient({ silent: true });
@@ -257,7 +267,7 @@ describe("Worker Integration with Database", () => {
   });
 
   beforeEach(async () => {
-    await queue.drain();
+    await queue.obliterate({ force: true });
     // Clean database for test isolation
     await prisma.deliveryAttempt.deleteMany({});
     await prisma.event.deleteMany({});
@@ -334,6 +344,7 @@ describe("Worker Integration with Database", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
@@ -445,6 +456,7 @@ describe("Worker Integration with Database", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }

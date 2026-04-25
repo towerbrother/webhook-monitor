@@ -14,3 +14,6 @@ process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? "silent";
 // Redis config for tests
 process.env.REDIS_HOST = process.env.REDIS_HOST ?? "localhost";
 process.env.REDIS_PORT = process.env.REDIS_PORT ?? "6379";
+// Isolate tests on a separate Redis DB so a locally-running worker
+// (e.g. docker compose, `pnpm dev`) on db 0 cannot consume test jobs.
+process.env.REDIS_DB = process.env.REDIS_DB ?? "1";
