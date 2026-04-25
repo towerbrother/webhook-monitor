@@ -24,6 +24,7 @@ import {
   createTestProject,
   createTestEndpoint,
   createTestEvent,
+  createTestDeliveryAttempt,
 } from "@repo/db/testing";
 
 let app: FastifyInstance;
@@ -680,6 +681,127 @@ describe.skipIf(skipTests)("GET /webhooks/:endpointId/events", () => {
       headers: {
         "x-project-key": project.projectKey,
       },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+});
+
+describe.skipIf(skipTests)("GET /webhooks/:endpointId/events/:eventId", () => {
+  it("returns 200 with full event payload and empty deliveryAttempts when no attempts exist", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id);
+    const event = await createTestEvent(prisma, project.id, endpoint.id, {
+      idempotencyKey: "key-detail",
+      headers: { "content-type": "application/json" },
+      body: { hello: "world" },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/webhooks/${endpoint.id}/events/${event.id}`,
+      headers: { "x-project-key": project.projectKey },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.id).toBe(event.id);
+    expect(body.status).toBe("PENDING");
+    expect(body.idempotencyKey).toBe("key-detail");
+    expect(body.receivedAt).toBeDefined();
+    expect(body.method).toBe("POST");
+    expect(body.headers).toBeDefined();
+    expect(body.body).toEqual({ hello: "world" });
+    expect(body.deliveryAttempts).toEqual([]);
+  });
+
+  it("returns deliveryAttempts ordered by attemptNumber ascending", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id);
+    const event = await createTestEvent(prisma, project.id, endpoint.id);
+
+    await createTestDeliveryAttempt(prisma, event.id, project.id, {
+      attemptNumber: 3,
+      statusCode: 500,
+      success: false,
+    });
+    await createTestDeliveryAttempt(prisma, event.id, project.id, {
+      attemptNumber: 1,
+      statusCode: 500,
+      success: false,
+    });
+    await createTestDeliveryAttempt(prisma, event.id, project.id, {
+      attemptNumber: 2,
+      statusCode: 200,
+      success: true,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/webhooks/${endpoint.id}/events/${event.id}`,
+      headers: { "x-project-key": project.projectKey },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.deliveryAttempts).toHaveLength(3);
+    expect(body.deliveryAttempts[0].attemptNumber).toBe(1);
+    expect(body.deliveryAttempts[1].attemptNumber).toBe(2);
+    expect(body.deliveryAttempts[2].attemptNumber).toBe(3);
+
+    const attempt = body.deliveryAttempts[0];
+    expect(attempt).toHaveProperty("id");
+    expect(attempt).toHaveProperty("attemptNumber");
+    expect(attempt).toHaveProperty("requestedAt");
+    expect(attempt).toHaveProperty("respondedAt");
+    expect(attempt).toHaveProperty("statusCode");
+    expect(attempt).toHaveProperty("success");
+    expect(attempt).toHaveProperty("errorMessage");
+  });
+
+  it("returns 404 for a cross-tenant event", async () => {
+    const prisma = getTestPrisma();
+    const project1 = await createTestProject(prisma);
+    const project2 = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project1.id);
+    const event = await createTestEvent(prisma, project1.id, endpoint.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/webhooks/${endpoint.id}/events/${event.id}`,
+      headers: { "x-project-key": project2.projectKey },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("returns 404 when endpointId does not match the event's endpoint", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpointA = await createTestEndpoint(prisma, project.id);
+    const endpointB = await createTestEndpoint(prisma, project.id);
+    const event = await createTestEvent(prisma, project.id, endpointA.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/webhooks/${endpointB.id}/events/${event.id}`,
+      headers: { "x-project-key": project.projectKey },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("returns 404 for a nonexistent event id", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id);
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/webhooks/${endpoint.id}/events/does-not-exist`,
+      headers: { "x-project-key": project.projectKey },
     });
 
     expect(response.statusCode).toBe(404);

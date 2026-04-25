@@ -11,6 +11,7 @@ import {
   type Project,
   type WebhookEndpoint,
   type Event,
+  type DeliveryAttempt,
 } from "../generated/client.js";
 
 /**
@@ -90,6 +91,31 @@ export async function createTestEvent(
       body: bodyValue,
       idempotencyKey:
         "idempotencyKey" in overrides ? overrides.idempotencyKey : null,
+    },
+  });
+}
+
+/**
+ * Create a test delivery attempt for a given event
+ */
+export async function createTestDeliveryAttempt(
+  prisma: PrismaClient,
+  eventId: string,
+  projectId: string,
+  overrides: Partial<
+    Omit<DeliveryAttempt, "id" | "eventId" | "projectId">
+  > = {}
+): Promise<DeliveryAttempt> {
+  return prisma.deliveryAttempt.create({
+    data: {
+      eventId,
+      projectId,
+      attemptNumber: overrides.attemptNumber ?? 1,
+      requestedAt: overrides.requestedAt ?? new Date(),
+      respondedAt: overrides.respondedAt ?? new Date(),
+      statusCode: overrides.statusCode ?? 200,
+      success: overrides.success ?? true,
+      errorMessage: overrides.errorMessage ?? null,
     },
   });
 }
