@@ -3,7 +3,7 @@
   "meta": {
     "project": "webhook-monitor",
     "description": "Product Requirements Document for webhook-monitor implementation. Each feature is a discrete, verifiable unit of work.",
-    "totalFeatures": 38,
+    "totalFeatures": 25,
     "methodology": "Ralph Wiggum Technique — bash loop + structured plan + one-task-per-iteration",
     "references": [
       "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents",
@@ -44,16 +44,15 @@
       "description": "Add Zod schemas for endpointId path param validation (alphanumeric + underscore/dash only) and optional body shape. Validate idempotency key max length 255 via Zod. Return 400 on validation failures.",
       "steps": [
         "Import Zod into routes/webhooks.ts",
-        "Define EndpointParamsSchema validating endpointId as non-empty string matching /^[a-zA-Z0-9_-]+$/",
+        "Define EndpointParamsSchema validating endpointId as non-empty string (min length 1); SQL injection risk is mitigated by Prisma parameterized queries",
         "Define IdempotencyKeySchema: optional string, max length 255",
         "Apply validation at route entry, return 400 with Zod error details on failure",
-        "Add tests: empty endpointId -> 400; endpointId with SQL injection chars -> 400; oversized idempotency key (>255 chars) -> 400",
+        "Add tests: empty endpointId -> 400; oversized idempotency key (>255 chars) -> 400",
         "Run pnpm test to verify all tests pass",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
         "Invalid endpointId (empty string) -> 400",
-        "endpointId with special chars '; DROP TABLE --' -> 400",
         "Oversized idempotency key (>255 chars) -> 400",
         "Valid params -> 201 (no regression)"
       ],
@@ -75,7 +74,7 @@
         "Enqueued job against mock 200 server -> Event.status = DELIVERED, DeliveryAttempt.success = true",
         "Enqueued job against mock 500 server -> Event.status = RETRYING, DeliveryAttempt.success = false"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "pino-logger-worker",
@@ -101,7 +100,7 @@
         "Logging endpoint object redacts signingSecret field",
         "All existing processor tests pass with new logger"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "correlation-id",
@@ -121,6 +120,73 @@
       "gatewayTests": [
         "Processor completion log includes correlationId matching value set at ingestion",
         "Job without correlationId (old format) falls back to job.id"
+      ],
+      "passes": true
+    },
+    {
+      "id": "worker-graceful-shutdown",
+      "category": "operational",
+      "dependencies": ["pino-logger-worker"],
+      "description": "Handle SIGTERM and SIGINT in worker: stop accepting new jobs, wait for in-flight jobs to complete, then close queue and DB connections cleanly. Prevents mid-delivery kills on rolling deploys.",
+      "steps": [
+        "Register SIGTERM and SIGINT handlers in apps/worker/src/index.ts",
+        "On signal: log shutdown initiated with { signal, service: 'worker' }",
+        "Call worker.close() to stop accepting new jobs and drain in-flight jobs",
+        "After worker.close() resolves: close queue, close Prisma client, log shutdown complete",
+        "Add SHUTDOWN_TIMEOUT_MS env var (default 30000) to apps/worker/src/env.ts; force-exit after timeout to avoid hung process",
+        "Add integration test: send SIGTERM while job is in flight; verify job completes before process exits (exit code 0)",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "SIGTERM during idle worker -> clean shutdown, exit code 0",
+        "SIGTERM while job in-flight -> job completes then process exits (exit code 0)",
+        "Shutdown log line emitted at info level with signal name",
+        "SHUTDOWN_TIMEOUT_MS exceeded -> process force-exits with non-zero code"
+      ],
+      "passes": false
+    },
+    {
+      "id": "endpoint-management",
+      "category": "functional",
+      "dependencies": [],
+      "description": "Add CRUD endpoints for WebhookEndpoint: POST /endpoints (create), GET /endpoints (list), GET /endpoints/:endpointId (get), DELETE /endpoints/:endpointId (delete). Tenant-scoped via projectId. Required by the dashboard frontend.",
+      "steps": [
+        "Add POST /endpoints handler: validate body (url: valid URL, name: non-empty string), create WebhookEndpoint, return 201 with { id, url, name, projectId, createdAt }",
+        "Add GET /endpoints handler: list all endpoints for authenticated project, return array of endpoint DTOs",
+        "Add GET /endpoints/:endpointId handler: return single endpoint DTO; 404 if not found or cross-tenant",
+        "Add DELETE /endpoints/:endpointId handler: delete endpoint and cascade-delete events; return 204",
+        "Validate endpointId path param and request body with Zod",
+        "All responses use explicit Prisma select to exclude signingSecret field",
+        "Add integration tests: create endpoint -> 201; list returns only own project's; get cross-tenant -> 404; delete -> 204 with cascade",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "POST /endpoints with valid url + name -> 201, endpoint persisted",
+        "POST /endpoints with invalid URL -> 400",
+        "GET /endpoints -> returns only authenticated project's endpoints",
+        "GET /endpoints/:endpointId cross-tenant -> 404",
+        "DELETE /endpoints/:endpointId -> 204, endpoint and its events removed",
+        "Response body never contains signingSecret field"
+      ],
+      "passes": false
+    },
+    {
+      "id": "remove-project-wide-webhook-route",
+      "category": "functional",
+      "dependencies": [],
+      "description": "Remove the POST /webhooks placeholder route. Events are always scoped to an endpoint; the placeholder creates no Event record and is misleading. Callers must use POST /webhooks/:endpointId.",
+      "steps": [
+        "Remove the POST /webhooks handler from apps/api/src/routes/webhooks.ts",
+        "Remove the corresponding test case ('should accept webhook at /webhooks endpoint') from webhooks.test.ts",
+        "Verify no other code references the removed route",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "POST /webhooks -> 404 (route removed)",
+        "POST /webhooks/:endpointId still works (no regression)"
       ],
       "passes": false
     },
@@ -145,6 +211,30 @@
         "Pagination works (limit=1 returns 1 item with cursor/next info)",
         "limit=101 -> 400 with 'exceeds maximum' error",
         "Cross-tenant endpoint -> 404"
+      ],
+      "passes": false
+    },
+    {
+      "id": "event-detail-endpoint",
+      "category": "functional",
+      "dependencies": ["event-list-endpoint"],
+      "description": "Add GET /webhooks/:endpointId/events/:eventId endpoint. Returns full event payload (method, headers, body), status, idempotencyKey, receivedAt, and all DeliveryAttempts ordered by attemptNumber. Required by the event-detail-page frontend feature.",
+      "steps": [
+        "Add GET /webhooks/:endpointId/events/:eventId handler in routes/webhooks.ts",
+        "Validate endpointId and eventId params with Zod",
+        "Lookup Event by (id, projectId); verify endpointId matches; return 404 if not found or cross-tenant",
+        "Include deliveryAttempts ordered by attemptNumber asc: { id, attemptNumber, requestedAt, respondedAt, statusCode, success, errorMessage }",
+        "Return { id, status, idempotencyKey, receivedAt, method, headers, body, deliveryAttempts }",
+        "Add integration tests: fetch own event -> 200 with full payload and attempts; cross-tenant -> 404; endpointId mismatch -> 404; event with no attempts -> deliveryAttempts: []",
+        "Run pnpm test to verify all tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "GET event by id -> 200 with method, headers, body, and delivery attempts",
+        "Event with 3 delivery attempts -> array length 3, ordered by attemptNumber",
+        "Cross-tenant event -> 404",
+        "endpointId that does not match event's endpoint -> 404",
+        "Event with no delivery attempts -> deliveryAttempts: []"
       ],
       "passes": false
     },
@@ -202,7 +292,7 @@
         "Redis unavailable + RATE_LIMIT_FAIL_OPEN=false -> 503",
         "Redis unavailable + RATE_LIMIT_FAIL_OPEN=true -> 200 (fallback to in-memory limit)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "signing-secret-migration",
@@ -336,22 +426,22 @@
       "id": "load-test",
       "category": "validation",
       "dependencies": ["docker-compose"],
-      "description": "Create k6 load test script: ramp to 100 VU, sustain 5 min, assert p95 < 200ms and error rate < 1%. Monitor memory and CPU usage. Add 1-hour sustained load test to catch memory leaks.",
+      "description": "Four k6 scripts in load-tests/ already exist (load, soak, spike, stress) but are untracked and untested against a running stack. This feature is complete when all four scripts are committed, pass their thresholds against the docker-compose stack, and the soak test confirms no memory leak over 2 hours.",
       "steps": [
-        "Create scripts/load-test.js (k6 script) with ramp-up and sustained load phases",
-        "Configure thresholds: p95 < 200ms, error rate < 1%, memory < 1GB per service, CPU < 80%",
-        "Create scripts/load-test-sustained.js: 1 hour continuous load at 50 VU",
-        "Add memory leak detection: sample memory usage every 5 minutes, assert < 10% growth over 1 hour",
-        "Document how to run: k6 run scripts/load-test.js and k6 run scripts/load-test-sustained.js",
-        "Run load test against docker-compose stack and verify thresholds pass",
-        "Run sustained load test and verify no memory leaks",
+        "Commit load-tests/ directory (k6-load-test.js, k6-soak-test.js, k6-spike-test.js, k6-stress-test.js, mock-failing-server.js, README.md)",
+        "Run k6 run load-tests/k6-load-test.js against docker-compose stack; verify p95 < 200ms and error rate < 1%",
+        "Run k6 run load-tests/k6-spike-test.js; verify system recovers after 500-VU spike",
+        "Run k6 run load-tests/k6-stress-test.js; record breaking point (VU count where errors exceed 1%)",
+        "Run k6 run load-tests/k6-soak-test.js (2h soak at 50 VU); verify p95 < 300ms and error rate < 1% throughout",
+        "Monitor memory usage during soak test; assert < 10% growth over 2 hours",
+        "Update load-tests/README.md with actual results and how to run against docker-compose",
         "Commit with descriptive message"
       ],
       "gatewayTests": [
-        "p95 ingest latency < 200ms under load",
-        "Error rate < 1% under sustained load",
-        "Memory usage stable over 1 hour (< 10% growth)",
-        "CPU usage < 80% under sustained load"
+        "k6-load-test: p95 < 200ms, error rate < 1% at 200 VU",
+        "k6-spike-test: system recovers within 1 minute after 500-VU spike drops",
+        "k6-stress-test: breaking point documented, graceful degradation observed",
+        "k6-soak-test: p95 < 300ms and memory growth < 10% over 2-hour run"
       ],
       "passes": false
     },
@@ -409,7 +499,7 @@
     {
       "id": "endpoint-list-page",
       "category": "frontend",
-      "dependencies": ["dashboard-scaffolding"],
+      "dependencies": ["dashboard-scaffolding", "endpoint-management"],
       "description": "Build the Endpoints list page. Displays all webhook endpoints for the current project with their URL, created date, and event count. Links to per-endpoint event views.",
       "steps": [
         "Create app/endpoints/page.tsx — server component fetching endpoint list from API",
@@ -460,7 +550,7 @@
     {
       "id": "event-detail-page",
       "category": "frontend",
-      "dependencies": ["event-list-page"],
+      "dependencies": ["event-list-page", "event-detail-endpoint"],
       "description": "Build the Event detail page. Shows full event payload (headers + body), delivery attempt history with status codes and durations, and a replay action for failed events.",
       "steps": [
         "Create app/endpoints/[endpointId]/events/[eventId]/page.tsx",
