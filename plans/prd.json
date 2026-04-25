@@ -212,7 +212,7 @@
         "limit=101 -> 400 with 'exceeds maximum' error",
         "Cross-tenant endpoint -> 404"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "event-detail-endpoint",

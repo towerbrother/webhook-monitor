@@ -23,6 +23,19 @@ const IdempotencyKeySchema = z
   .string()
   .max(255, "Idempotency key must not exceed 255 characters");
 
+const MAX_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 50;
+
+const EventListQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_PAGE_SIZE, `Page size exceeds maximum of ${MAX_PAGE_SIZE}`)
+    .default(DEFAULT_PAGE_SIZE),
+  cursor: z.string().min(1).optional(),
+});
+
 /**
  * Extract and validate idempotency key from request headers
  * Returns undefined if header is not present
@@ -201,5 +214,74 @@ export async function webhookRoutes(
       // Re-throw any other error
       throw error;
     }
+  });
+
+  /**
+   * GET /webhooks/:endpointId/events
+   * List events for a specific endpoint, scoped to the authenticated project.
+   */
+  fastify.get<{
+    Params: { endpointId: string };
+    Querystring: { limit?: string; cursor?: string };
+  }>("/webhooks/:endpointId/events", async (request, reply) => {
+    const paramsValidation = EndpointParamsSchema.safeParse(request.params);
+    if (!paramsValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid endpoint ID",
+        details: paramsValidation.error.issues,
+      });
+    }
+
+    const queryValidation = EventListQuerySchema.safeParse(request.query);
+    if (!queryValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: queryValidation.error.issues[0]?.message ?? "Invalid query",
+        details: queryValidation.error.issues,
+      });
+    }
+
+    const { endpointId } = paramsValidation.data;
+    const { limit, cursor } = queryValidation.data;
+    const { project } = request;
+
+    const endpoint = await fastify.prisma.webhookEndpoint.findFirst({
+      where: { id: endpointId, projectId: project.id },
+      select: { id: true },
+    });
+
+    if (!endpoint) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message:
+          "Webhook endpoint not found or does not belong to this project",
+      });
+    }
+
+    // Fetch limit+1 to detect whether more pages exist
+    const rows = await fastify.prisma.event.findMany({
+      where: {
+        endpointId,
+        projectId: project.id,
+      },
+      select: {
+        id: true,
+        status: true,
+        idempotencyKey: true,
+        receivedAt: true,
+        method: true,
+        headers: true,
+      },
+      orderBy: [{ receivedAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+    });
+
+    const hasMore = rows.length > limit;
+    const events = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore ? events[events.length - 1]!.id : null;
+
+    return reply.status(200).send({ events, nextCursor });
   });
 }
