@@ -263,7 +263,7 @@
         "Cross-project event -> 404",
         "11th replay within 1 minute -> 429 Too Many Requests"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "rate-limiting",

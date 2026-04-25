@@ -91,6 +91,7 @@ export async function createTestEvent(
       body: bodyValue,
       idempotencyKey:
         "idempotencyKey" in overrides ? overrides.idempotencyKey : null,
+      ...(overrides.status && { status: overrides.status }),
     },
   });
 }
