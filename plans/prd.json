@@ -346,7 +346,7 @@
         "No signature header, endpoint has no secret -> 201",
         "2MB request body -> 413 Payload Too Large"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "prometheus-metrics",

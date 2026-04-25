@@ -59,6 +59,9 @@ export async function createTestEndpoint(
       projectId,
       url: overrides.url ?? `https://example.com/webhook/${uniqueId()}`,
       name: overrides.name ?? `Test Endpoint ${uniqueId()}`,
+      ...(overrides.signingSecret !== undefined && {
+        signingSecret: overrides.signingSecret,
+      }),
     },
   });
 }

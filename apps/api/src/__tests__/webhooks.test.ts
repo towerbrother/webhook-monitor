@@ -26,6 +26,7 @@ import {
   createTestEvent,
   createTestDeliveryAttempt,
 } from "@repo/db/testing";
+import { signWebhookBody } from "@repo/shared";
 
 let app: FastifyInstance;
 let queue: Queue<WebhookDeliveryJobData>;
@@ -991,5 +992,148 @@ describe.skipIf(skipTests)("Health Check", () => {
     expect(body.status).toBe("ok");
     expect(body.timestamp).toBeDefined();
     expect(body.service).toContain("api");
+  });
+});
+
+describe.skipIf(skipTests)("HMAC Signature Verification", () => {
+  const secret = "super-secret-signing-key";
+
+  it("returns 201 when signature is valid", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id, {
+      signingSecret: secret,
+    });
+
+    const payload = JSON.stringify({ event: "push" });
+    const rawBody = Buffer.from(payload);
+    const sig = signWebhookBody(rawBody, secret);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/webhooks/${endpoint.id}`,
+      headers: {
+        "x-project-key": project.projectKey,
+        "content-type": "application/json",
+        "x-hub-signature-256": sig,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(true);
+    expect(body.eventId).toBeDefined();
+  });
+
+  it("returns 401 when signature header is missing and endpoint has a secret", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id, {
+      signingSecret: secret,
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/webhooks/${endpoint.id}`,
+      headers: {
+        "x-project-key": project.projectKey,
+        "content-type": "application/json",
+        // intentionally no x-hub-signature-256
+      },
+      payload: JSON.stringify({ event: "push" }),
+    });
+
+    expect(response.statusCode).toBe(401);
+    const body = JSON.parse(response.body);
+    expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 401 when signature is wrong (different secret)", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id, {
+      signingSecret: secret,
+    });
+
+    const payload = JSON.stringify({ event: "push" });
+    const sig = signWebhookBody(Buffer.from(payload), "wrong-secret");
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/webhooks/${endpoint.id}`,
+      headers: {
+        "x-project-key": project.projectKey,
+        "content-type": "application/json",
+        "x-hub-signature-256": sig,
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(401);
+    const body = JSON.parse(response.body);
+    expect(body.error).toBe("Unauthorized");
+  });
+
+  it("returns 201 without signature when endpoint has no secret", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id);
+    // no signingSecret
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/webhooks/${endpoint.id}`,
+      headers: {
+        "x-project-key": project.projectKey,
+        "content-type": "application/json",
+      },
+      payload: JSON.stringify({ event: "push" }),
+    });
+
+    expect(response.statusCode).toBe(201);
+  });
+
+  it("returns 413 when the request body exceeds 1MB", async () => {
+    const largeBody = Buffer.alloc(2 * 1024 * 1024, 0x78); // 2MB
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/webhooks/any-endpoint-id",
+      headers: {
+        "content-type": "application/octet-stream",
+      },
+      payload: largeBody,
+    });
+
+    expect(response.statusCode).toBe(413);
+  });
+
+  it("does not create an event when signature verification fails (before DB write)", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id, {
+      signingSecret: secret,
+    });
+
+    const beforeCount = await prisma.event.count({
+      where: { endpointId: endpoint.id },
+    });
+
+    await app.inject({
+      method: "POST",
+      url: `/webhooks/${endpoint.id}`,
+      headers: {
+        "x-project-key": project.projectKey,
+        "content-type": "application/json",
+        "x-hub-signature-256": "sha256=invalid",
+      },
+      payload: JSON.stringify({ event: "push" }),
+    });
+
+    const afterCount = await prisma.event.count({
+      where: { endpointId: endpoint.id },
+    });
+    expect(afterCount).toBe(beforeCount);
   });
 });

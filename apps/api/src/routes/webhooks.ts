@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Prisma, isIdempotencyConflict, EventStatus } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
 import { enqueueWebhookDelivery } from "@repo/queue";
+import { verifyWebhookSignature } from "@repo/shared";
 import { z } from "zod";
 import type { Redis } from "ioredis";
 import fastifyRateLimit from "@fastify/rate-limit";
@@ -135,13 +136,25 @@ export async function webhookRoutes(
     });
   }
 
+  // Parse all incoming bodies as raw Buffer so HMAC can be verified against
+  // the exact bytes the sender signed. JSON body storage is handled manually
+  // in the route handler via JSON.parse.
+  fastify.removeAllContentTypeParsers();
+  fastify.addContentTypeParser(
+    "*",
+    { parseAs: "buffer" },
+    (_req, body, done) => {
+      done(null, body);
+    }
+  );
+
   /**
    * POST /webhooks/:endpointId
    * Receive a webhook event for a specific endpoint
    */
   fastify.post<{
     Params: { endpointId: string };
-    Body: unknown;
+    Body: Buffer;
   }>("/webhooks/:endpointId", async (request, reply) => {
     // Validate params
     const paramsValidation = EndpointParamsSchema.safeParse(request.params);
@@ -155,6 +168,10 @@ export async function webhookRoutes(
 
     const { endpointId } = paramsValidation.data;
     const { project } = request; // Attached by authenticateProject middleware
+
+    // Raw bytes — needed for HMAC verification and stored body
+    const rawBody: Buffer =
+      request.body instanceof Buffer ? request.body : Buffer.alloc(0);
 
     // Extract and validate idempotency key
     const idempotencyKey = extractIdempotencyKey(request.headers);
@@ -171,11 +188,17 @@ export async function webhookRoutes(
       }
     }
 
-    // Verify endpoint belongs to the authenticated project
+    // Verify endpoint belongs to the authenticated project.
+    // Include signingSecret so HMAC can be verified before event creation.
     const endpoint = await fastify.prisma.webhookEndpoint.findFirst({
       where: {
         id: endpointId,
         projectId: project.id,
+      },
+      select: {
+        id: true,
+        url: true,
+        signingSecret: true,
       },
     });
 
@@ -187,6 +210,33 @@ export async function webhookRoutes(
       });
     }
 
+    // HMAC signature verification — only when endpoint has a signingSecret
+    if (endpoint.signingSecret) {
+      const sigHeader = request.headers["x-hub-signature-256"];
+      const sig = Array.isArray(sigHeader) ? sigHeader[0] : sigHeader;
+
+      if (
+        !sig ||
+        !verifyWebhookSignature(rawBody, sig, endpoint.signingSecret)
+      ) {
+        return reply.status(401).send({
+          error: "Unauthorized",
+          message: "Invalid webhook signature",
+        });
+      }
+    }
+
+    // Parse body for storage: try JSON, fall back to raw string, then null
+    let parsedBody: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+      Prisma.JsonNull;
+    if (rawBody.length > 0) {
+      try {
+        parsedBody = JSON.parse(rawBody.toString("utf8")) as Prisma.InputJsonValue;
+      } catch {
+        parsedBody = rawBody.toString("utf8") as Prisma.InputJsonValue;
+      }
+    }
+
     try {
       // Create event record with idempotency key if provided
       const event = await fastify.prisma.event.create({
@@ -195,13 +245,12 @@ export async function webhookRoutes(
           projectId: project.id,
           method: request.method,
           headers: request.headers as Prisma.InputJsonValue,
-          body: (request.body as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+          body: parsedBody,
           ...(idempotencyKey && { idempotencyKey }),
         },
       });
 
       // Enqueue delivery job (fire-and-forget, don't block response)
-      // In production, consider handling enqueue failures
       enqueueWebhookDelivery(fastify.queue, {
         eventId: event.id,
         projectId: project.id,
@@ -209,7 +258,7 @@ export async function webhookRoutes(
         url: endpoint.url,
         method: request.method,
         headers: request.headers as Record<string, unknown>,
-        body: request.body,
+        body: parsedBody,
         attempt: 1,
         correlationId: request.id,
       }).catch((err: unknown) => {

@@ -3,6 +3,8 @@
  * This package is used to verify monorepo wiring works correctly
  */
 
+export { verifyWebhookSignature, signWebhookBody } from "./hmac.js";
+
 // Application name constant
 export const APP_NAME = "webhook-monitor" as const;
 

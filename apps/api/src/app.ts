@@ -33,6 +33,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   const fastify = Fastify({
     logger: options.logger ?? false,
+    bodyLimit: 1_048_576, // 1MB — enforced before content-type parsing
   });
 
   // Decorate fastify with prisma and queue for route access
