@@ -202,24 +202,4 @@ export async function webhookRoutes(
       throw error;
     }
   });
-
-  /**
-   * POST /webhooks
-   * Receive a webhook event (project-wide, not tied to specific endpoint)
-   */
-  fastify.post<{
-    Body: unknown;
-  }>("/webhooks", async (request, reply) => {
-    const { project } = request; // Attached by authenticateProject middleware
-
-    // For project-wide webhooks, you might want to create a default endpoint
-    // or handle differently. For now, returning a simple success response.
-
-    return reply.status(200).send({
-      success: true,
-      message: "Webhook received for project",
-      projectId: project.id,
-      projectName: project.name,
-    });
-  });
 }

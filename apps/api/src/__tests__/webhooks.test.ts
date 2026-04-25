@@ -3,7 +3,6 @@
  *
  * Tests for the webhook ingestion API endpoints:
  * - POST /webhooks/:endpointId - Receive webhook for specific endpoint
- * - POST /webhooks - Project-wide webhook (placeholder)
  *
  * Validates:
  * - Authentication via X-Project-Key header
@@ -274,7 +273,7 @@ describe.skipIf(skipTests)("Webhook Ingestion API", () => {
   });
 
   describe("Project-wide Webhook", () => {
-    it("should accept webhook at /webhooks endpoint", async () => {
+    it("should return 404 for POST /webhooks (route removed; events must be scoped to an endpoint)", async () => {
       const prisma = getTestPrisma();
       const project = await createTestProject(prisma);
 
@@ -287,10 +286,7 @@ describe.skipIf(skipTests)("Webhook Ingestion API", () => {
         payload: { test: true },
       });
 
-      expect(response.statusCode).toBe(200);
-      const body = JSON.parse(response.body);
-      expect(body.success).toBe(true);
-      expect(body.projectId).toBe(project.id);
+      expect(response.statusCode).toBe(404);
     });
   });
 

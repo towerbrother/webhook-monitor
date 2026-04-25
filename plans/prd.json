@@ -188,7 +188,7 @@
         "POST /webhooks -> 404 (route removed)",
         "POST /webhooks/:endpointId still works (no regression)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "event-list-endpoint",
