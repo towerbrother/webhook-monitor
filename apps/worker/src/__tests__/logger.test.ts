@@ -14,6 +14,7 @@ describe("createLogger", () => {
     REDIS_PORT: 6379,
     NODE_ENV: "test",
     LOG_LEVEL: "info",
+    SHUTDOWN_TIMEOUT_MS: 30000,
   };
 
   it("should create a logger with all required methods", () => {

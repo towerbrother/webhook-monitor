@@ -4,6 +4,7 @@ import { createPrismaClient } from "@repo/db";
 import { validateEnv } from "./env.js";
 import { processWebhookDelivery } from "./processor.js";
 import { createLogger } from "./logger.js";
+import { createShutdownHandler } from "./shutdown.js";
 
 const env = validateEnv();
 const logger = createLogger(env);
@@ -66,17 +67,7 @@ async function main() {
     logger.error({ error: err.message }, "Worker error");
   });
 
-  // Graceful shutdown
-  const shutdown = async (signal: string) => {
-    logger.info(
-      { signal },
-      "Received shutdown signal, shutting down gracefully"
-    );
-    await worker.close();
-    await prisma.$disconnect();
-    logger.info("Worker stopped");
-    process.exit(0);
-  };
+  const shutdown = createShutdownHandler(worker, prisma, logger, env.SHUTDOWN_TIMEOUT_MS);
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
