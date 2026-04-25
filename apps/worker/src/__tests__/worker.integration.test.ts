@@ -30,14 +30,18 @@ describe("Worker Integration", () => {
       redis: {
         host: process.env.REDIS_HOST ?? "localhost",
         port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
         maxRetriesPerRequest: null,
       },
     });
     await queue.waitUntilReady();
+    // Obliterate any leftover state from a previous (possibly failed) run
+    // so jobId-based deduplication doesn't keep new adds out of "waiting".
+    await queue.obliterate({ force: true });
   });
 
   beforeEach(async () => {
-    await queue.drain();
+    await queue.obliterate({ force: true });
   });
 
   afterAll(async () => {
@@ -58,6 +62,7 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
@@ -76,14 +81,12 @@ describe("Worker Integration", () => {
       correlationId: "test-correlation-integration",
     };
 
-    await enqueueWebhookDelivery(queue, jobData);
-
-    // Wait for job to be processed
-    await new Promise<void>((resolve) => {
-      worker.on("completed", () => {
-        resolve();
-      });
+    const completionPromise = new Promise<void>((resolve) => {
+      worker.on("completed", () => resolve());
     });
+
+    await enqueueWebhookDelivery(queue, jobData);
+    await completionPromise;
 
     // Verify job was processed
     expect(processedJobs).toContain("integration-test-event");
@@ -103,11 +106,20 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
         concurrency: 1, // Process one at a time for order guarantee
       }
     );
+
+    const completionPromise = new Promise<void>((resolve) => {
+      let completed = 0;
+      worker.on("completed", () => {
+        completed++;
+        if (completed === 3) resolve();
+      });
+    });
 
     // Enqueue multiple jobs
     for (let i = 1; i <= 3; i++) {
@@ -124,14 +136,7 @@ describe("Worker Integration", () => {
       });
     }
 
-    // Wait for all jobs
-    await new Promise<void>((resolve) => {
-      let completed = 0;
-      worker.on("completed", () => {
-        completed++;
-        if (completed === 3) resolve();
-      });
-    });
+    await completionPromise;
 
     expect(processedOrder).toEqual(["event-1", "event-2", "event-3"]);
 
@@ -167,6 +172,7 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
@@ -194,6 +200,7 @@ describe("Worker Integration", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
@@ -221,12 +228,12 @@ describe("Worker Integration", () => {
       correlationId: "test-correlation-complex",
     };
 
-    await enqueueWebhookDelivery(queue, complexJobData);
-
-    // Wait for job to be processed
-    await new Promise<void>((resolve) => {
+    const completionPromise = new Promise<void>((resolve) => {
       worker.on("completed", () => resolve());
     });
+
+    await enqueueWebhookDelivery(queue, complexJobData);
+    await completionPromise;
 
     expect(processedData).toHaveLength(1);
     expect(processedData[0]).toEqual(complexJobData);
@@ -247,10 +254,12 @@ describe("Worker Integration with Database", () => {
       redis: {
         host: process.env.REDIS_HOST ?? "localhost",
         port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+        db: parseInt(process.env.REDIS_DB ?? "0", 10),
         maxRetriesPerRequest: null,
       },
     });
     await queue.waitUntilReady();
+    await queue.obliterate({ force: true });
 
     // Initialize Prisma
     prisma = createPrismaClient({ silent: true });
@@ -258,7 +267,7 @@ describe("Worker Integration with Database", () => {
   });
 
   beforeEach(async () => {
-    await queue.drain();
+    await queue.obliterate({ force: true });
     // Clean database for test isolation
     await prisma.deliveryAttempt.deleteMany({});
     await prisma.event.deleteMany({});
@@ -335,10 +344,15 @@ describe("Worker Integration with Database", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
     );
+
+    const completionPromise = new Promise<void>((resolve) => {
+      worker.on("completed", () => resolve());
+    });
 
     // Enqueue job pointing to mock server
     await enqueueWebhookDelivery(queue, {
@@ -353,10 +367,7 @@ describe("Worker Integration with Database", () => {
       correlationId: "test-correlation-success",
     });
 
-    // Wait for job completion
-    await new Promise<void>((resolve) => {
-      worker.on("completed", () => resolve());
-    });
+    await completionPromise;
 
     // Verify mock server received request
     expect(requestReceived).toBe(true);
@@ -445,10 +456,15 @@ describe("Worker Integration with Database", () => {
         connection: {
           host: process.env.REDIS_HOST ?? "localhost",
           port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
+          db: parseInt(process.env.REDIS_DB ?? "0", 10),
           maxRetriesPerRequest: null,
         },
       }
     );
+
+    const failurePromise = new Promise<void>((resolve) => {
+      worker.on("failed", () => resolve());
+    });
 
     // Enqueue job pointing to mock server
     await enqueueWebhookDelivery(queue, {
@@ -463,10 +479,7 @@ describe("Worker Integration with Database", () => {
       correlationId: "test-correlation-failure",
     });
 
-    // Wait for job to fail
-    await new Promise<void>((resolve) => {
-      worker.on("failed", () => resolve());
-    });
+    await failurePromise;
 
     // Query DeliveryAttempt via Prisma
     const deliveryAttempts = await prisma.deliveryAttempt.findMany({

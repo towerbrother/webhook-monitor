@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.test.ts"],
     globals: true,
+    setupFiles: ["./src/__tests__/setup.ts"],
     // Timeout for Redis operations
     testTimeout: 10000,
   },

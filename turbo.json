@@ -22,12 +22,12 @@
     "test": {
       "dependsOn": ["^test"],
       "cache": false,
-      "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "LOG_LEVEL"]
+      "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "REDIS_DB", "LOG_LEVEL"]
     },
     "@repo/worker#test": {
       "dependsOn": ["^test", "@repo/api#test"],
       "cache": false,
-      "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "LOG_LEVEL"]
+      "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "REDIS_DB", "LOG_LEVEL"]
     }
   }
 }
