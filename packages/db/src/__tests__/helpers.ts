@@ -59,6 +59,9 @@ export async function createTestEndpoint(
       projectId,
       url: overrides.url ?? `https://example.com/webhook/${uniqueId()}`,
       name: overrides.name ?? `Test Endpoint ${uniqueId()}`,
+      ...(overrides.signingSecret !== undefined && {
+        signingSecret: overrides.signingSecret,
+      }),
     },
   });
 }
@@ -103,9 +106,7 @@ export async function createTestDeliveryAttempt(
   prisma: PrismaClient,
   eventId: string,
   projectId: string,
-  overrides: Partial<
-    Omit<DeliveryAttempt, "id" | "eventId" | "projectId">
-  > = {}
+  overrides: Partial<Omit<DeliveryAttempt, "id" | "eventId" | "projectId">> = {}
 ): Promise<DeliveryAttempt> {
   return prisma.deliveryAttempt.create({
     data: {
