@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { Prisma, isIdempotencyConflict } from "@repo/db";
+import { Prisma, isIdempotencyConflict, EventStatus } from "@repo/db";
 import { authenticateProject } from "../middleware/authenticate-project.js";
 import { enqueueWebhookDelivery } from "@repo/queue";
 import { z } from "zod";
@@ -30,6 +30,35 @@ const EventParamsSchema = z.object({
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 50;
+
+const REPLAY_RATE_LIMIT_MAX = 10;
+const REPLAY_RATE_LIMIT_WINDOW_MS = 60_000;
+
+interface ReplayRateLimitEntry {
+  count: number;
+  windowStart: number;
+}
+
+function makeReplayRateLimiter() {
+  const counters = new Map<string, ReplayRateLimitEntry>();
+
+  return function consume(projectId: string): boolean {
+    const now = Date.now();
+    const entry = counters.get(projectId);
+
+    if (!entry || now - entry.windowStart >= REPLAY_RATE_LIMIT_WINDOW_MS) {
+      counters.set(projectId, { count: 1, windowStart: now });
+      return true;
+    }
+
+    if (entry.count >= REPLAY_RATE_LIMIT_MAX) {
+      return false;
+    }
+
+    entry.count++;
+    return true;
+  };
+}
 
 const EventListQuerySchema = z.object({
   limit: z.coerce
@@ -76,6 +105,8 @@ export async function webhookRoutes(
   // Apply authentication middleware first so req.project is available
   // for the rate-limit keyGenerator registered below
   fastify.addHook("preHandler", authenticateProject);
+
+  const consumeReplayRateLimit = makeReplayRateLimiter();
 
   // Rate limiting — registered after auth so req.project is populated.
   // /health is outside this plugin scope and is never rate-limited.
@@ -346,5 +377,90 @@ export async function webhookRoutes(
     }
 
     return reply.status(200).send(event);
+  });
+
+  /**
+   * POST /webhooks/:endpointId/events/:eventId/replay
+   * Re-enqueue a FAILED event. Rate-limited to 10 replays/min per project.
+   */
+  fastify.post<{
+    Params: { endpointId: string; eventId: string };
+  }>("/webhooks/:endpointId/events/:eventId/replay", async (request, reply) => {
+    const paramsValidation = EventParamsSchema.safeParse(request.params);
+    if (!paramsValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid parameters",
+        details: paramsValidation.error.issues,
+      });
+    }
+
+    const { endpointId, eventId } = paramsValidation.data;
+    const { project } = request;
+
+    const event = await fastify.prisma.event.findFirst({
+      where: { id: eventId, projectId: project.id, endpointId },
+      select: {
+        id: true,
+        status: true,
+        endpointId: true,
+        method: true,
+        headers: true,
+        body: true,
+        endpoint: { select: { url: true } },
+      },
+    });
+
+    if (!event) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message: "Event not found or does not belong to this endpoint",
+      });
+    }
+
+    if (!consumeReplayRateLimit(project.id)) {
+      return reply.status(429).send({
+        error: "Too Many Requests",
+        message: "Replay rate limit exceeded. Maximum 10 replays per minute per project.",
+      });
+    }
+
+    if (event.status === EventStatus.DELIVERED) {
+      return reply.status(200).send({ queued: false, message: "Already delivered" });
+    }
+
+    if (
+      event.status === EventStatus.PENDING ||
+      event.status === EventStatus.RETRYING
+    ) {
+      return reply.status(200).send({ queued: false, message: "Already in progress" });
+    }
+
+    // FAILED: log, reset to PENDING, enqueue
+    fastify.log.info(
+      { eventId: event.id, projectId: project.id, correlationId: request.id, action: "replay" },
+      "Replaying failed event"
+    );
+
+    await fastify.prisma.event.update({
+      where: { id: event.id },
+      data: { status: EventStatus.PENDING },
+    });
+
+    enqueueWebhookDelivery(fastify.queue, {
+      eventId: event.id,
+      projectId: project.id,
+      endpointId: event.endpointId,
+      url: event.endpoint.url,
+      method: event.method,
+      headers: event.headers as Record<string, unknown>,
+      body: event.body,
+      attempt: 1,
+      correlationId: request.id,
+    }).catch((err: unknown) => {
+      fastify.log.error({ err, eventId: event.id }, "Failed to enqueue replay job");
+    });
+
+    return reply.status(202).send({ queued: true, eventId: event.id });
   });
 }

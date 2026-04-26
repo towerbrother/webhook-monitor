@@ -808,6 +808,177 @@ describe.skipIf(skipTests)("GET /webhooks/:endpointId/events/:eventId", () => {
   });
 });
 
+describe.skipIf(skipTests)(
+  "POST /webhooks/:endpointId/events/:eventId/replay",
+  () => {
+    it("returns 202 and updates Event.status to PENDING when event is FAILED", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id, {
+        status: "FAILED",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}/events/${event.id}/replay`,
+        headers: { "x-project-key": project.projectKey },
+      });
+
+      expect(response.statusCode).toBe(202);
+      const body = JSON.parse(response.body);
+      expect(body.queued).toBe(true);
+      expect(body.eventId).toBe(event.id);
+
+      const updated = await prisma.event.findUnique({
+        where: { id: event.id },
+      });
+      expect(updated!.status).toBe("PENDING");
+    });
+
+    it("returns 200 with queued:false when event is DELIVERED", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id, {
+        status: "DELIVERED",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}/events/${event.id}/replay`,
+        headers: { "x-project-key": project.projectKey },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.queued).toBe(false);
+      expect(body.message).toBe("Already delivered");
+    });
+
+    it("returns 200 with queued:false when event is PENDING", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}/events/${event.id}/replay`,
+        headers: { "x-project-key": project.projectKey },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.queued).toBe(false);
+      expect(body.message).toBe("Already in progress");
+    });
+
+    it("returns 200 with queued:false when event is RETRYING", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpoint.id, {
+        status: "RETRYING",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}/events/${event.id}/replay`,
+        headers: { "x-project-key": project.projectKey },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.queued).toBe(false);
+      expect(body.message).toBe("Already in progress");
+    });
+
+    it("returns 404 for a nonexistent event", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}/events/does-not-exist/replay`,
+        headers: { "x-project-key": project.projectKey },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("returns 404 for a cross-tenant event", async () => {
+      const prisma = getTestPrisma();
+      const project1 = await createTestProject(prisma);
+      const project2 = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project1.id);
+      const event = await createTestEvent(prisma, project1.id, endpoint.id, {
+        status: "FAILED",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}/events/${event.id}/replay`,
+        headers: { "x-project-key": project2.projectKey },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("returns 404 when endpointId does not match the event's endpoint", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpointA = await createTestEndpoint(prisma, project.id);
+      const endpointB = await createTestEndpoint(prisma, project.id);
+      const event = await createTestEvent(prisma, project.id, endpointA.id, {
+        status: "FAILED",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpointB.id}/events/${event.id}/replay`,
+        headers: { "x-project-key": project.projectKey },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("returns 429 after the 11th replay within one minute", async () => {
+      const prisma = getTestPrisma();
+      const project = await createTestProject(prisma);
+      const endpoint = await createTestEndpoint(prisma, project.id);
+
+      // Create 11 events in DELIVERED status (replay returns 200 no-op but still counts)
+      const events = await Promise.all(
+        Array.from({ length: 11 }).map(() =>
+          createTestEvent(prisma, project.id, endpoint.id, {
+            status: "DELIVERED",
+          })
+        )
+      );
+
+      // First 10 replay requests succeed (200 no-op for DELIVERED)
+      for (let i = 0; i < 10; i++) {
+        const resp = await app.inject({
+          method: "POST",
+          url: `/webhooks/${endpoint.id}/events/${events[i]!.id}/replay`,
+          headers: { "x-project-key": project.projectKey },
+        });
+        expect(resp.statusCode).toBe(200);
+      }
+
+      // 11th should be rate limited
+      const resp = await app.inject({
+        method: "POST",
+        url: `/webhooks/${endpoint.id}/events/${events[10]!.id}/replay`,
+        headers: { "x-project-key": project.projectKey },
+      });
+      expect(resp.statusCode).toBe(429);
+    });
+  }
+);
+
 describe.skipIf(skipTests)("Health Check", () => {
   it("should return ok status", async () => {
     const response = await app.inject({
