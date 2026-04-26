@@ -170,7 +170,7 @@
         "DELETE /endpoints/:endpointId -> 204, endpoint and its events removed",
         "Response body never contains signingSecret field"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "remove-project-wide-webhook-route",

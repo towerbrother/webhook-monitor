@@ -4,6 +4,7 @@ import type { Queue, WebhookDeliveryJobData } from "@repo/queue";
 import { APP_NAME, type HealthCheckResponse } from "@repo/shared";
 import type { Redis } from "ioredis";
 import { webhookRoutes } from "./routes/webhooks.js";
+import { endpointRoutes } from "./routes/endpoints.js";
 
 export interface AppOptions {
   prisma: PrismaClient;
@@ -55,6 +56,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     rateLimitWindowMs,
     rateLimitFailOpen,
   });
+
+  await fastify.register(endpointRoutes);
 
   return fastify;
 }
