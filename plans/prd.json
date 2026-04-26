@@ -144,7 +144,7 @@
         "Shutdown log line emitted at info level with signal name",
         "SHUTDOWN_TIMEOUT_MS exceeded -> process force-exits with non-zero code"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "endpoint-management",

@@ -16,6 +16,13 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
+  SHUTDOWN_TIMEOUT_MS: z
+    .string()
+    .default("30000")
+    .transform((val) => parseInt(val, 10))
+    .refine((val) => !isNaN(val) && val > 0, {
+      message: "SHUTDOWN_TIMEOUT_MS must be a positive number",
+    }),
 });
 
 export type Env = z.infer<typeof envSchema>;
