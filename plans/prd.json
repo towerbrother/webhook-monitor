@@ -236,7 +236,7 @@
         "endpointId that does not match event's endpoint -> 404",
         "Event with no delivery attempts -> deliveryAttempts: []"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "replay-endpoint",

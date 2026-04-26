@@ -23,6 +23,11 @@ const IdempotencyKeySchema = z
   .string()
   .max(255, "Idempotency key must not exceed 255 characters");
 
+const EventParamsSchema = z.object({
+  endpointId: z.string().min(1, "endpointId must not be empty"),
+  eventId: z.string().min(1, "eventId must not be empty"),
+});
+
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -283,5 +288,63 @@ export async function webhookRoutes(
     const nextCursor = hasMore ? events[events.length - 1]!.id : null;
 
     return reply.status(200).send({ events, nextCursor });
+  });
+
+  /**
+   * GET /webhooks/:endpointId/events/:eventId
+   * Return full event detail with delivery attempts, scoped to the authenticated project.
+   */
+  fastify.get<{
+    Params: { endpointId: string; eventId: string };
+  }>("/webhooks/:endpointId/events/:eventId", async (request, reply) => {
+    const paramsValidation = EventParamsSchema.safeParse(request.params);
+    if (!paramsValidation.success) {
+      return reply.status(400).send({
+        error: "Bad Request",
+        message: "Invalid parameters",
+        details: paramsValidation.error.issues,
+      });
+    }
+
+    const { endpointId, eventId } = paramsValidation.data;
+    const { project } = request;
+
+    const event = await fastify.prisma.event.findFirst({
+      where: {
+        id: eventId,
+        projectId: project.id,
+        endpointId,
+      },
+      select: {
+        id: true,
+        status: true,
+        idempotencyKey: true,
+        receivedAt: true,
+        method: true,
+        headers: true,
+        body: true,
+        deliveryAttempts: {
+          select: {
+            id: true,
+            attemptNumber: true,
+            requestedAt: true,
+            respondedAt: true,
+            statusCode: true,
+            success: true,
+            errorMessage: true,
+          },
+          orderBy: { attemptNumber: "asc" },
+        },
+      },
+    });
+
+    if (!event) {
+      return reply.status(404).send({
+        error: "Not Found",
+        message: "Event not found or does not belong to this endpoint",
+      });
+    }
+
+    return reply.status(200).send(event);
   });
 }
