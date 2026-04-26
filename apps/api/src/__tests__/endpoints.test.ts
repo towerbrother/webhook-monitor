@@ -245,6 +245,67 @@ describe.skipIf(skipTests)("GET /endpoints/:endpointId", () => {
   });
 });
 
+describe.skipIf(skipTests)("signingSecret isolation", () => {
+  it("does not expose signingSecret in GET /endpoints/:endpointId even when set", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id);
+
+    await prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: { signingSecret: "super-secret-value" },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/endpoints/${endpoint.id}`,
+      headers: { "x-project-key": project.projectKey },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body).not.toHaveProperty("signingSecret");
+  });
+
+  it("does not expose signingSecret in GET /endpoints list even when set", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+    const endpoint = await createTestEndpoint(prisma, project.id);
+
+    await prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: { signingSecret: "super-secret-list-value" },
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/endpoints",
+      headers: { "x-project-key": project.projectKey },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body).toHaveLength(1);
+    expect(body[0]).not.toHaveProperty("signingSecret");
+  });
+
+  it("does not expose signingSecret in POST /endpoints response", async () => {
+    const prisma = getTestPrisma();
+    const project = await createTestProject(prisma);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/endpoints",
+      headers: { "x-project-key": project.projectKey },
+      payload: { url: "https://example.com/secret-test", name: "Secret Test" },
+    });
+
+    expect(response.statusCode).toBe(201);
+    const body = JSON.parse(response.body);
+    expect(body).not.toHaveProperty("signingSecret");
+  });
+});
+
 describe.skipIf(skipTests)("DELETE /endpoints/:endpointId", () => {
   it("deletes endpoint and returns 204", async () => {
     const prisma = getTestPrisma();

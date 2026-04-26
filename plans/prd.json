@@ -318,7 +318,7 @@
         "No regression in existing tests",
         "Logging endpoint object does NOT expose signingSecret (redacted by Pino)"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "hmac-verification",
