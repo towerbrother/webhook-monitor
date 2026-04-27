@@ -564,6 +564,7 @@
       "id": "event-monitoring-dashboard",
       "category": "frontend",
       "dependencies": ["endpoint-management-dashboard"],
+      "passes": true,
       "description": "Build the event list page per endpoint with live 5-second polling and inline replay for failed events. Users can see incoming webhook events, watch status update in real time without refreshing, navigate between pages of events, and trigger replays directly from the list.",
       "steps": [
         "Create apps/web/app/endpoints/[endpointId]/events/page.tsx as a client component",
@@ -590,8 +591,7 @@
         "429 rate-limit response shown as Toast with clear message",
         "Load More button loads next page and appends rows to existing list",
         "Playwright E2E: page renders with correct column headers and at least one StatusBadge"
-      ],
-      "passes": false
+      ]
     },
     {
       "id": "event-detail-replay-dashboard",
