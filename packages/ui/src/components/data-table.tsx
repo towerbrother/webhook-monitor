@@ -21,6 +21,7 @@ export function DataTable<TData, TValue = unknown>({
   isLoading,
   emptyState,
 }: DataTableProps<TData, TValue>) {
+  "use no memo";
   const table = useReactTable<TData>({
     data,
     columns: columns as ColumnDef<TData>[],
@@ -42,7 +43,7 @@ export function DataTable<TData, TValue = unknown>({
                     ? null
                     : flexRender(
                         header.column.columnDef.header,
-                        header.getContext(),
+                        header.getContext()
                       )}
                 </th>
               ))}

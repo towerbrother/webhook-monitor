@@ -13,19 +13,17 @@ const columns = [
 describe("DataTable", () => {
   it("renders 3 skeleton rows when isLoading=true", () => {
     const { container } = render(
-      <DataTable columns={columns} data={[]} isLoading={true} />,
+      <DataTable columns={columns} data={[]} isLoading={true} />
     );
-    const skeletons = container.querySelectorAll("[data-testid='skeleton-row']");
+    const skeletons = container.querySelectorAll(
+      "[data-testid='skeleton-row']"
+    );
     expect(skeletons.length).toBe(3);
   });
 
   it("renders emptyState when data=[] and isLoading=false", () => {
     render(
-      <DataTable
-        columns={columns}
-        data={[]}
-        emptyState={<div>No data</div>}
-      />,
+      <DataTable columns={columns} data={[]} emptyState={<div>No data</div>} />
     );
     expect(screen.getByText("No data")).toBeDefined();
   });

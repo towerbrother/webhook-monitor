@@ -25,7 +25,7 @@ export function SidebarNav({ items, activePath }: SidebarNavProps) {
             href={href}
             className={cn(
               "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-              isActive && "bg-primary/10 font-medium text-primary",
+              isActive && "bg-primary/10 font-medium text-primary"
             )}
           >
             {Icon && <Icon className="h-4 w-4" />}

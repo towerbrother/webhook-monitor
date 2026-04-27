@@ -4,7 +4,10 @@ export type EventStatus = "PENDING" | "RETRYING" | "DELIVERED" | "FAILED";
 
 const statusConfig: Record<
   EventStatus,
-  { label: string; variant: "warning" | "secondary" | "success" | "destructive" }
+  {
+    label: string;
+    variant: "warning" | "secondary" | "success" | "destructive";
+  }
 > = {
   PENDING: { label: "Pending", variant: "warning" },
   RETRYING: { label: "Retrying", variant: "secondary" },

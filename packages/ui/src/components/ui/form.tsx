@@ -10,11 +10,11 @@ type FormFieldContextValue = {
 };
 
 const FormFieldContext = React.createContext<FormFieldContextValue>(
-  {} as FormFieldContextValue,
+  {} as FormFieldContextValue
 );
 
 const FormItemContext = React.createContext<{ id: string }>(
-  {} as { id: string },
+  {} as { id: string }
 );
 
 const FormField = ({
