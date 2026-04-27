@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "@repo/db": "workspace:*",
+    "tailwindcss": "^4.0.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@testing-library/dom": "^10.4.0",
