@@ -1,15 +1,9 @@
 {
-  "$schema": "ralph-plan-v1",
   "meta": {
     "project": "webhook-monitor",
     "description": "Product Requirements Document for webhook-monitor implementation. Each feature is a discrete, verifiable unit of work.",
-    "totalFeatures": 25,
-    "methodology": "Ralph Wiggum Technique — bash loop + structured plan + one-task-per-iteration",
-    "references": [
-      "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents",
-      "https://ghuntley.com/ralph/",
-      "https://github.com/ghuntley/how-to-ralph-wiggum"
-    ]
+    "totalFeatures": 31,
+    "methodology": "Ralph Wiggum Technique — bash loop + structured plan + one-task-per-iteration"
   },
   "features": [
     {
@@ -349,8 +343,320 @@
       "passes": true
     },
     {
+      "id": "shared-validation-schemas",
+      "category": "refactor",
+      "dependencies": ["zod-validation", "endpoint-management"],
+      "description": "Move the duplicated Zod schema definitions (EndpointParamsSchema, EventParamsSchema, IdempotencyKeySchema) out of individual route handlers into a single shared file at apps/api/src/schemas/params.ts. Both routes/endpoints.ts and routes/webhooks.ts currently define EndpointParamsSchema independently; a schema change requires editing two files. This refactor establishes a single source of truth for all API parameter schemas.",
+      "steps": [
+        "Create apps/api/src/schemas/params.ts exporting EndpointParamsSchema, EventParamsSchema, and IdempotencyKeySchema",
+        "Remove the inline EndpointParamsSchema definition from routes/endpoints.ts and import from schemas/params.ts instead",
+        "Remove the inline EndpointParamsSchema definition from routes/webhooks.ts and import from schemas/params.ts instead",
+        "Verify no other inline schema definitions remain duplicated across route files",
+        "Run pnpm test to verify all existing validation tests still pass (no regression)",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Invalid endpointId -> 400 on /endpoints routes (no regression)",
+        "Invalid endpointId -> 400 on /webhooks routes (no regression)",
+        "Oversized idempotency key -> 400 (no regression)",
+        "EndpointParamsSchema defined exactly once in the codebase (grep confirms no duplicates)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "logger-interface-abstraction",
+      "category": "refactor",
+      "dependencies": ["pino-logger-worker"],
+      "description": "Replace the Logger type alias (ReturnType<typeof createLogger>) in apps/worker/src/logger.ts with an explicit minimal interface that declares only the methods actually called by processor.ts: info, warn, error, and child. The current type exposes the full Pino API surface, forcing processor tests to construct a 10+ method mock object. With a 4-method interface, the mock collapses to exactly what the processor needs.",
+      "steps": [
+        "Define an explicit Logger interface in apps/worker/src/logger.ts with only the methods used by processor.ts: info(obj: object | string, msg?: string): void; warn(obj: object | string, msg?: string): void; error(obj: object | string, msg?: string): void; child(bindings: Record<string, unknown>): Logger",
+        "Replace the existing 'export type Logger = ReturnType<typeof createLogger>' with the new explicit interface export",
+        "Verify createLogger() return type satisfies the Logger interface (TypeScript will enforce this at compile time)",
+        "Replace the full Pino mock in apps/worker/src/__tests__/processor.test.ts with a minimal mock that implements only the 4-method Logger interface",
+        "Grep processor.ts for any Pino-specific method calls outside the interface (isLevelEnabled, flush, etc.) and remove them or add them to the interface if genuinely needed",
+        "Run pnpm check-types and pnpm test to verify no regressions",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "All existing processor tests pass with the minimal 4-method logger mock",
+        "Logger mock in processor.test.ts no longer references Pino-specific methods (isLevelEnabled, flush, levelVal, bindings)",
+        "createLogger() return value is assignable to Logger interface (no TypeScript errors)",
+        "pnpm check-types reports zero errors after the change"
+      ],
+      "passes": false
+    },
+    {
+      "id": "event-lifecycle-manager",
+      "category": "refactor",
+      "dependencies": ["replay-endpoint", "worker-integration-test"],
+      "description": "Consolidate event status transition logic into a shared EventLifecycleManager exported from packages/db. Currently the replay route in apps/api checks statuses with manual if-statements while the worker calls canTransition() from packages/db directly. Both paths must enforce the same state machine rules. The manager exposes validateTransition and a replayGuard helper so the replay route no longer contains hand-rolled status checks.",
+      "steps": [
+        "Create packages/db/src/event-lifecycle.ts exporting an EventLifecycleManager object with: validateTransition(from: EventStatus, to: EventStatus): boolean (delegates to existing canTransition logic); replayGuard(status: EventStatus): { canReplay: boolean; reason: string } (encodes the DELIVERED / PENDING+RETRYING / FAILED decision tree from the replay route)",
+        "Deprecate or remove the bare canTransition() export from domain.ts and re-implement it via EventLifecycleManager.validateTransition to eliminate duplication (keep the export for backward compatibility but mark it @deprecated)",
+        "Update apps/api/src/routes/webhooks.ts replay handler: replace the manual status if-statements (currently checking DELIVERED, PENDING, RETRYING) with a call to EventLifecycleManager.replayGuard(event.status)",
+        "Update apps/worker/src/processor.ts: replace the direct canTransition() call with EventLifecycleManager.validateTransition()",
+        "Export EventLifecycleManager from packages/db/src/index.ts",
+        "Add unit tests for EventLifecycleManager in packages/db covering all valid transitions, all invalid transitions, and all replayGuard outcomes",
+        "Run pnpm test to verify all existing replay and worker processor tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Replay FAILED event -> 202 (no regression)",
+        "Replay DELIVERED event -> 200 { queued: false } (no regression)",
+        "Replay PENDING event -> 200 { queued: false } (no regression)",
+        "Worker delivery uses EventLifecycleManager.validateTransition (grep confirms no direct canTransition call in processor.ts)",
+        "EventLifecycleManager unit tests cover every EventStatus value as both source and target"
+      ],
+      "passes": false
+    },
+    {
+      "id": "rate-limit-strategy-abstraction",
+      "category": "refactor",
+      "dependencies": ["rate-limiting", "replay-endpoint"],
+      "description": "Unify the three independent rate-limiting mechanisms — the HTTP @fastify/rate-limit plugin (redis-rate-limit-store.ts), the inline replay rate limiter (makeReplayRateLimiter inside webhooks.ts), and the in-memory fallback inside the store — behind a single RateLimitStrategy interface. Define the interface in apps/api/src/plugins/rate-limit-strategy.ts. Each mechanism becomes an implementation. A FallbackRateLimitStrategy wraps any primary+fallback pair, replacing the duplicated fallback logic. The replay route receives its strategy via dependency injection rather than constructing it inline.",
+      "steps": [
+        "Create apps/api/src/plugins/rate-limit-strategy.ts defining: interface RateLimitStrategy { check(key: string): Promise<{ allowed: boolean; remaining: number; resetAt: number }> } and type RateLimitResult = { allowed: boolean; remaining: number; resetAt: number }",
+        "Implement RedisRateLimitStrategy(redis: Redis, windowMs: number, max: number): RateLimitStrategy using ioredis INCR/EXPIRE",
+        "Implement InMemoryRateLimitStrategy(windowMs: number, max: number): RateLimitStrategy by extracting the Map-based logic from makeReplayRateLimiter()",
+        "Implement FallbackRateLimitStrategy(primary: RateLimitStrategy, fallback: RateLimitStrategy): RateLimitStrategy that catches primary errors and delegates to fallback — this replaces the duplicated fallback logic in redis-rate-limit-store.ts and the inline replay limiter",
+        "Refactor redis-rate-limit-store.ts to delegate its incr logic to a RedisRateLimitStrategy internally, removing the duplicate in-memory Map it currently maintains",
+        "Remove makeReplayRateLimiter() from routes/webhooks.ts and replace the inline usage with an injected RateLimitStrategy (passed as a parameter to the route registration function or via Fastify decorator)",
+        "Add unit tests for all three strategy implementations using mocked Redis and real in-memory state",
+        "Run pnpm test to verify all existing rate-limit and replay tests pass (no regression)",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Replay rate limit: 11th replay in 1 minute -> 429 (no regression)",
+        "HTTP rate limit: 101st authenticated request -> 429 (no regression)",
+        "Redis unavailable -> FallbackRateLimitStrategy delegates to InMemoryRateLimitStrategy transparently (no regression)",
+        "RateLimitStrategy unit tests run without a running Redis instance",
+        "No in-memory Map fallback logic duplicated between redis-rate-limit-store.ts and the replay limiter (grep confirms single implementation)"
+      ],
+      "passes": false
+    },
+    {
+      "id": "webhook-service-layer",
+      "category": "refactor",
+      "dependencies": [
+        "idempotency-key-extraction",
+        "zod-validation",
+        "hmac-verification",
+        "shared-validation-schemas"
+      ],
+      "description": "Extract webhook ingestion business logic from the POST /webhooks/:endpointId route handler into a WebhookIngestionService module at apps/api/src/services/webhook-ingestion.ts. The service encapsulates HMAC verification, event creation, idempotency conflict resolution (returning a typed discriminated-union result instead of throwing), and job enqueueing with explicit failure handling. The route handler becomes a thin HTTP adapter. Also removes the global removeAllContentTypeParsers() side effect from route registration — the current implementation modifies shared Fastify state for all routes — and replaces it with a scoped addContentTypeParser call.",
+      "steps": [
+        "Create apps/api/src/services/webhook-ingestion.ts and define a discriminated-union result type: type IngestResult = { type: 'created'; event: Event } | { type: 'duplicate'; event: Event } | { type: 'signature_invalid' } | { type: 'enqueue_failed'; event: Event; error: Error }",
+        "Implement ingestWebhook(deps: { prisma, queue, logger }, params: { endpointId, projectId, rawBody, headers }): Promise<IngestResult> that performs: endpoint lookup, HMAC verification (returning signature_invalid on failure), event creation with idempotency conflict catch (returning duplicate on P2002), and job enqueueing (returning enqueue_failed on queue error instead of silently logging)",
+        "Replace the global removeAllContentTypeParsers() call on line 142 of routes/webhooks.ts with fastify.addContentTypeParser('*', { parseAs: 'buffer' }, ...) scoped to the ingest route only",
+        "Refactor the POST /webhooks/:endpointId route handler to call ingestWebhook() and map each IngestResult variant to its HTTP response",
+        "Add unit tests for ingestWebhook() covering all four result types without instantiating a Fastify server — pass a fake prisma and a fake queue as deps",
+        "Run pnpm test to verify all existing integration tests pass with no regression",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Valid webhook ingest -> 201 (no regression)",
+        "Duplicate idempotency key -> 409 with original eventId (no regression)",
+        "Invalid HMAC signature -> 401 (no regression)",
+        "Queue enqueue failure -> event still saved in DB, 201 returned, error logged (previously the failure was silently swallowed)",
+        "ingestWebhook() unit tests run without a Fastify server or HTTP layer"
+      ],
+      "passes": false
+    },
+    {
+      "id": "ui-design-system",
+      "category": "frontend",
+      "dependencies": [],
+      "description": "Create @repo/ui — a shared component library and design token package consumed by apps/web (and future apps). Built on Tailwind CSS v4 and shadcn/ui. Defines a single source of truth for colors, typography, spacing, and reusable UI primitives. All dashboard features depend on this package.",
+      "steps": [
+        "Create packages/ui directory with package.json (name: @repo/ui), tsconfig.json extending @repo/typescript-config/react-library.json, eslint.config.js extending @repo/eslint-config/react-internal",
+        "Add packages/ui to pnpm-workspace.yaml if not already present; add @repo/ui dependency to apps/web/package.json",
+        "Install in packages/ui: tailwindcss, class-variance-authority, clsx, tailwind-merge, @radix-ui/* primitives needed by shadcn/ui components",
+        "Create packages/ui/src/styles/globals.css with Tailwind v4 @theme block defining shared design tokens: --color-primary (slate-900), --color-primary-foreground (white), --color-success (green-500), --color-warning (amber-500), --color-destructive (red-500), --color-status-pending (yellow-400), --color-status-retrying (orange-400), --color-status-delivered (green-500), --color-status-failed (red-500), --color-muted (slate-100), --color-muted-foreground (slate-500), --radius (0.5rem)",
+        "Add shadcn/ui primitive components to packages/ui/src/components/ui/: Button (with variants: default, destructive, outline, ghost, link; sizes: sm, md, lg), Card + CardHeader + CardTitle + CardDescription + CardContent + CardFooter, Badge (with variants: default, secondary, destructive, outline), Input, Label, Dialog + DialogContent + DialogHeader + DialogTitle + DialogDescription + DialogFooter + DialogTrigger, Alert + AlertDescription, Separator, DropdownMenu + DropdownMenuTrigger + DropdownMenuContent + DropdownMenuItem, Tooltip + TooltipContent + TooltipTrigger + TooltipProvider, Skeleton, Form + FormField + FormItem + FormLabel + FormMessage + FormControl",
+        "Create packages/ui/src/components/status-badge.tsx: accepts EventStatus enum value, maps to Badge variant and label (PENDING=warning/'Pending', DELIVERED=success/'Delivered', FAILED=destructive/'Failed', RETRYING=secondary/'Retrying')",
+        "Create packages/ui/src/components/copy-button.tsx: accepts text prop; renders icon button that copies to clipboard; shows CheckIcon for 2000ms after successful copy, then reverts to CopyIcon",
+        "Create packages/ui/src/components/page-shell.tsx: two-column flex layout — fixed 240px sidebar (bg-background border-r) + flex-1 scrollable main area; accepts sidebar and children slots",
+        "Create packages/ui/src/components/sidebar-nav.tsx: accepts items: Array<{ href: string; label: string; icon?: React.ComponentType }>; renders nav links with active state detected via usePathname; active item has bg-primary/10 text-primary font-medium",
+        "Create packages/ui/src/components/section-card.tsx: Card wrapper accepting title: string, description?: string, action?: React.ReactNode (renders in card header right side), and children",
+        "Create packages/ui/src/components/empty-state.tsx: centered layout with optional icon (40px), heading (text-lg font-medium), description (text-sm text-muted-foreground), optional action button slot",
+        "Create packages/ui/src/components/data-table.tsx: generic DataTable<T> accepting columns: ColumnDef<T>[], data: T[], isLoading?: boolean, emptyState?: React.ReactNode; renders Table with header from columns; when isLoading renders Skeleton rows (3 rows, each column cell a Skeleton); uses @tanstack/react-table for column definitions",
+        "Export all components from packages/ui/src/index.ts with named exports",
+        "Configure apps/web/app/globals.css to import from @repo/ui/src/styles/globals.css so design tokens are available",
+        "Run pnpm check-types to verify zero TypeScript errors across packages/ui and apps/web",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "pnpm check-types reports zero errors for packages/ui",
+        "StatusBadge with DELIVERED renders a green Badge with label 'Delivered'",
+        "StatusBadge with FAILED renders a red Badge with label 'Failed'",
+        "DataTable renders 3 Skeleton rows when isLoading=true",
+        "DataTable renders emptyState slot when data=[] and isLoading=false",
+        "CopyButton copies text to clipboard and shows CheckIcon for 2 seconds",
+        "apps/web can import and render Button, Card, StatusBadge from @repo/ui without errors"
+      ],
+      "passes": false
+    },
+    {
+      "id": "project-api-management",
+      "category": "functional",
+      "dependencies": ["ui-design-system"],
+      "description": "Add project creation and listing API endpoints, plus a project switcher in the dashboard. Mimics production API-key management: users create projects via the dashboard, receive a one-time-shown project key, and store the active key in localStorage. All dashboard API calls are scoped to the active project via X-Project-Key.",
+      "steps": [
+        "Create apps/api/src/routes/projects.ts with POST /projects (unauthenticated): validate body (name: non-empty string), generate projectKey via crypto.randomUUID(), create Project record, return 201 with { id, name, projectKey, createdAt } — projectKey returned in full only at creation time",
+        "Add GET /projects (unauthenticated, local dev only): return all projects with masked keys ({ id, name, maskedKey: first8chars + '...' + last4chars, createdAt }); never return full projectKey",
+        "Add DELETE /projects/:projectId (unauthenticated, local dev only): delete project and all cascade data (endpoints, events, delivery attempts via Prisma cascade), return 204",
+        "Register projectRoutes in buildApp in apps/api/src/app.ts before webhookRoutes and endpointRoutes",
+        "Add integration tests: POST /projects valid name -> 201 with UUID projectKey; POST /projects empty name -> 400; GET /projects -> masked keys only; DELETE /projects/:id -> 204 with verified cascade",
+        "Create apps/web/src/context/project-context.tsx: React context with { activeProjectId: string | null, activeProjectKey: string | null, projectName: string | null, setActiveProject(id, key, name): void, clearProject(): void }; reads from localStorage key 'wm_active_project' on mount; persists to localStorage on setActiveProject",
+        "Create apps/web/src/lib/api.ts: typed API client class with base URL from process.env.NEXT_PUBLIC_API_URL; constructor accepts optional projectKey; all authenticated methods send X-Project-Key header; export createApiClient(projectKey: string | null) factory",
+        "Create apps/web/src/hooks/use-api.ts: hook returning an api client instance bound to the active project key from ProjectContext",
+        "Create apps/web/src/components/new-project-dialog.tsx: Dialog form with name Input; on submit calls POST /projects; on success shows full projectKey in read-only Input with CopyButton; displays Alert warning 'This key will not be shown again — copy it now'; on dialog close calls setActiveProject and stores key; closes dialog",
+        "Create apps/web/src/components/project-switcher.tsx: fetches GET /projects on mount; renders DropdownMenu showing current project name (or 'Select Project' if none); menu items: each project (clicking calls setActiveProject with stored key — but since full key is not in GET /projects, prompt user to re-enter key for existing projects via a key-entry dialog); 'New Project' option opens NewProjectDialog; 'Clear' option calls clearProject",
+        "Add ProjectProvider wrapping children in apps/web/app/layout.tsx; render ProjectSwitcher in the sidebar",
+        "Add NEXT_PUBLIC_API_URL=http://localhost:3001 to apps/web/.env and apps/web/.env.example",
+        "Run pnpm check-types; Run pnpm test to verify all API tests pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "POST /projects with valid name -> 201, projectKey is UUID (crypto.randomUUID format)",
+        "POST /projects with empty name -> 400 Bad Request",
+        "GET /projects -> array of projects with maskedKey (never full projectKey)",
+        "DELETE /projects/:projectId -> 204, project row and all child rows removed from DB",
+        "Dashboard: create project via NewProjectDialog -> full key shown once with CopyButton -> stored in localStorage -> sidebar shows project name",
+        "Switching project in dropdown updates active project context -> subsequent API calls include the new X-Project-Key",
+        "Refreshing the page restores active project from localStorage"
+      ],
+      "passes": false
+    },
+    {
+      "id": "endpoint-management-dashboard",
+      "category": "frontend",
+      "dependencies": ["ui-design-system", "project-api-management"],
+      "description": "Scaffold the Next.js App Router layout with the shared design system and implement the endpoints management page as the first vertical slice. Users can see all webhook endpoints for their active project, create new ones (with optional signing secret), and delete them — all from the dashboard.",
+      "steps": [
+        "Update apps/web/app/layout.tsx: wrap with ProjectProvider; render PageShell from @repo/ui with SidebarNav items: [{ href: '/', label: 'Dashboard' }, { href: '/endpoints', label: 'Endpoints' }]; include ProjectSwitcher above nav items in sidebar",
+        "Create apps/web/app/endpoints/page.tsx as a client component: fetches GET /endpoints using useApi hook; renders SectionCard with title 'Endpoints' and 'New Endpoint' Button in the action slot",
+        "Create apps/web/src/components/endpoints/endpoint-table.tsx: DataTable with columns — Name (link to /endpoints/[id]/events), URL (truncated with Tooltip showing full URL), Created At (formatted date), Actions (DeleteEndpointButton); accepts isLoading prop",
+        "Create apps/web/src/components/endpoints/create-endpoint-dialog.tsx: Dialog with form fields — Name (Input, required), URL (Input type=url, required), Signing Secret (Input type=password with show/hide toggle, optional); on submit POST /endpoints; on 400 show field-level error messages from API response; on 201 close dialog, show success Toast 'Endpoint created', call onSuccess callback to refresh list",
+        "Create apps/web/src/components/endpoints/delete-endpoint-dialog.tsx: AlertDialog showing 'Delete [endpoint name]?' with warning that all associated events will be deleted; on confirm DELETE /endpoints/:endpointId; on 204 close dialog, show Toast 'Endpoint deleted', call onSuccess callback",
+        "Wire up: NewEndpointButton opens CreateEndpointDialog; each table row Actions cell renders DeleteEndpointButton opening DeleteEndpointDialog; on success handlers refetch endpoints list",
+        "Show EmptyState component when endpoints array is empty with message 'No endpoints yet' and action 'Create your first endpoint'",
+        "Show Alert with error message if GET /endpoints fails (e.g. 401 if no project key selected)",
+        "Add Playwright config: apps/web/playwright.config.ts with webServer { command: 'pnpm dev', url: 'http://localhost:3000', reuseExistingServer: true }; add test:e2e and test:e2e:ui scripts to apps/web/package.json",
+        "Write E2E test apps/web/e2e/endpoints.spec.ts: (1) navigate to /endpoints, verify DataTable renders; (2) click New Endpoint, fill form, submit, verify new row appears; (3) click Delete on that row, confirm, verify row disappears",
+        "Run pnpm check-types and npx playwright test to verify all pass",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Navigating to /endpoints renders the endpoint DataTable (or EmptyState if none)",
+        "Creating endpoint with valid name + URL -> row appears in table without full page reload",
+        "Creating endpoint with invalid URL -> 400 error displayed as field message in form",
+        "Creating endpoint with optional signing secret -> endpoint created (secret not shown in table)",
+        "Deleting endpoint shows confirmation dialog naming the endpoint -> on confirm row removed",
+        "Each endpoint row name links to /endpoints/[endpointId]/events",
+        "401 error (no project key) shows Alert with message rather than crashing",
+        "Playwright E2E: create + delete endpoint flow passes"
+      ],
+      "passes": false
+    },
+    {
+      "id": "event-monitoring-dashboard",
+      "category": "frontend",
+      "dependencies": ["endpoint-management-dashboard"],
+      "description": "Build the event list page per endpoint with live 5-second polling and inline replay for failed events. Users can see incoming webhook events, watch status update in real time without refreshing, navigate between pages of events, and trigger replays directly from the list.",
+      "steps": [
+        "Create apps/web/app/endpoints/[endpointId]/events/page.tsx as a client component",
+        "On mount fetch GET /endpoints/:endpointId to get endpoint name for breadcrumb and page title; on 404 redirect to /endpoints with error Toast",
+        "Fetch GET /webhooks/:endpointId/events?limit=20 using useApi hook; store { events, nextCursor } in state",
+        "Implement 5-second polling: useEffect with setInterval calling refetch function (re-fetches current page without resetting cursor); clear interval on unmount",
+        "Render SectionCard with title '[Endpoint Name] — Events' and a green pulsing 'Live' Badge in the action slot indicating polling is active",
+        "Render DataTable with columns — Event ID (first 8 chars in monospace font with CopyButton for full ID), Status (StatusBadge), Method (Badge variant=secondary), Received At (relative time e.g. '2 min ago' with Tooltip showing full timestamp), Actions",
+        "In Actions column: for FAILED events render a Replay Button (RefreshCw icon); for all events render a View Details link (arrow icon) to /endpoints/[endpointId]/events/[eventId]",
+        "Replay flow: clicking Replay opens AlertDialog 'Replay this event? It will be re-queued for delivery.'; on confirm POST .../replay; on 202 optimistically update event status to PENDING in local state and show success Toast 'Event queued for replay'; on 429 show Toast 'Rate limit: max 10 replays per minute'",
+        "Render pagination controls below the table: 'Load more' Button that appends next page results (cursor-based) when nextCursor is not null; show '— No more events —' when nextCursor is null and events.length > 0",
+        "Handle empty state: EmptyState with 'No events yet — send a webhook to this endpoint to see it here' and a code snippet showing the endpoint's POST URL",
+        "Add breadcrumb above the SectionCard: Endpoints > [Endpoint Name] > Events",
+        "Write E2E test apps/web/e2e/events.spec.ts: verify event list renders with StatusBadge; verify polling indicator visible; verify Replay button only on FAILED rows",
+        "Run pnpm check-types and npx playwright test",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Event list renders DataTable with StatusBadge colors matching each EventStatus",
+        "Live polling indicator (green pulsing Badge) visible on page",
+        "New event appears in the list within 5 seconds of being received (polling cycle)",
+        "Replay button visible only on rows with status=FAILED, not on DELIVERED or PENDING rows",
+        "Clicking Replay on FAILED event -> confirmation dialog -> 202 response -> row status optimistically updates to PENDING",
+        "429 rate-limit response shown as Toast with clear message",
+        "Load More button loads next page and appends rows to existing list",
+        "Playwright E2E: page renders with correct column headers and at least one StatusBadge"
+      ],
+      "passes": false
+    },
+    {
+      "id": "event-detail-replay-dashboard",
+      "category": "frontend",
+      "dependencies": ["event-monitoring-dashboard"],
+      "description": "Build the event detail page showing the full webhook request payload (headers + body), a delivery attempt timeline, and a replay action for failed events. This is the deepest level of the core user journey.",
+      "steps": [
+        "Create apps/web/app/endpoints/[endpointId]/events/[eventId]/page.tsx as a server component fetching GET /webhooks/:endpointId/events/:eventId; on 404 redirect to event list with error Toast",
+        "Render breadcrumb: Endpoints > [Endpoint Name] > Events > [Event ID truncated to 8 chars]",
+        "Render 'Event Overview' SectionCard with metadata grid: Status (StatusBadge), Method (Badge), Event ID (full ID with CopyButton), Idempotency Key (value with CopyButton, or '—' if null), Received At (formatted absolute datetime)",
+        "If event status is FAILED, render a Replay Button (variant=destructive) in the SectionCard action slot; clicking opens AlertDialog for confirmation; on confirm POST .../replay via client-side fetch; on 202 show Toast 'Queued for replay' and refresh page status optimistically; on error show Toast with error message",
+        "Render 'Request Headers' SectionCard: render headers object as a two-column key/value table (key: text-muted-foreground monospace, value: monospace); add a 'Copy JSON' button that copies JSON.stringify(headers, null, 2) to clipboard; if more than 8 header entries, show first 8 with a 'Show all [n] headers' toggle",
+        "Render 'Request Body' SectionCard: if body is null or empty render EmptyState 'No request body'; otherwise render body as syntax-highlighted pre/code block (use JSON.stringify(body, null, 2) for objects, raw string otherwise); add CopyButton for body content",
+        "Render 'Delivery Attempts' SectionCard: render vertical ordered list; each attempt row shows: attempt number circle badge, requested-at timestamp, duration in ms (respondedAt - requestedAt, or '—' if no respondedAt), HTTP status code chip (2xx=green bg, 3xx=blue bg, 4xx=yellow bg, 5xx=red bg), success/failure icon (CheckCircle green or XCircle red), error message in Alert variant=destructive if errorMessage is non-null",
+        "When deliveryAttempts is empty, render EmptyState 'No delivery attempts yet'",
+        "Write E2E test apps/web/e2e/event-detail.spec.ts: navigate from event list to detail page -> verify Overview, Headers, Body, and Delivery Attempts sections all render; verify breadcrumb is correct",
+        "Run pnpm check-types and npx playwright test",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Event detail page renders Overview, Request Headers, Request Body, and Delivery Attempts sections",
+        "HTTP status code chip colored correctly: 200=green, 422=yellow, 500=red",
+        "Delivery attempts ordered by attemptNumber ascending",
+        "Duration computed correctly in milliseconds (respondedAt - requestedAt)",
+        "Empty deliveryAttempts array shows EmptyState in that section",
+        "Replay button visible and enabled only when event status is FAILED",
+        "Confirming replay -> Toast shown -> status in overview updates",
+        "Breadcrumb navigation links back to event list correctly",
+        "Playwright E2E: navigate from event list to detail -> all four sections visible"
+      ],
+      "passes": false
+    },
+    {
+      "id": "dashboard-overview",
+      "category": "frontend",
+      "dependencies": ["endpoint-management-dashboard"],
+      "description": "Build the dashboard home page with summary metrics and quick access to recent failures. Aggregates data client-side from existing API endpoints. Auto-refreshes every 30 seconds. Uses the shared design system throughout.",
+      "steps": [
+        "Create apps/web/app/page.tsx as a client component (root route, replaces the placeholder)",
+        "On mount and every 30 seconds: fetch GET /endpoints to get all endpoints; for each endpoint fetch GET /webhooks/:endpointId/events?limit=100; aggregate: totalEvents (sum of all event counts), deliveredCount, failedCount, pendingCount, retryingCount, activeEndpointsCount",
+        "Render page title 'Dashboard' with a subtitle showing the active project name from ProjectContext",
+        "Render 4 summary SectionCards in a responsive 2-column grid (md:grid-cols-4): Total Events (count), Delivery Success Rate (deliveredCount/totalEvents × 100, formatted '87.3%'), Active Endpoints (activeEndpointsCount), Failed Events (failedCount with destructive color if > 0)",
+        "Render 'Delivery Status Breakdown' SectionCard: 4-item horizontal stat row showing count + StatusBadge for each EventStatus (PENDING, DELIVERED, FAILED, RETRYING)",
+        "Render 'Recent Failures' SectionCard: DataTable of the 10 most recent FAILED events across all endpoints; columns — Endpoint Name (link to endpoint events page), Event ID (truncated with CopyButton), Received At (relative time), Actions (Replay Button inline); if no failed events show EmptyState 'No failures — all clear'",
+        "Replay from overview uses same pattern as event-monitoring-dashboard: AlertDialog confirmation -> POST replay -> Toast + optimistic update",
+        "Handle loading state: render Skeleton cards while data is being fetched",
+        "Handle empty state (no endpoints): render EmptyState with 'Create your first endpoint to start monitoring webhooks' and CTA button linking to /endpoints",
+        "Write E2E test apps/web/e2e/dashboard.spec.ts: dashboard renders summary cards and Recent Failures section",
+        "Run pnpm check-types and npx playwright test",
+        "Commit with descriptive message"
+      ],
+      "gatewayTests": [
+        "Dashboard renders 4 summary cards with numeric values",
+        "Delivery success rate = '0.0%' when no DELIVERED events, '100.0%' when all delivered",
+        "Recent Failures DataTable shows only FAILED events",
+        "Replay button in Recent Failures triggers confirmation and POST replay (no regression)",
+        "Auto-refresh every 30 seconds updates counts without user interaction",
+        "Empty state shown when project has no endpoints",
+        "Playwright E2E: dashboard page loads, summary cards and Delivery Status Breakdown visible"
+      ],
+      "passes": false
+    },
+    {
       "id": "prometheus-metrics",
       "category": "operational",
+      "deferred": true,
       "dependencies": [],
       "description": "Add Prometheus-compatible metrics using prom-client. Instrument: events_received_total, delivery_attempts_total, delivery_duration_ms, queue_depth, events_status_total. Expose /metrics on API with optional Bearer token auth. Worker exposes on internal port (default 9091).",
       "steps": [
@@ -379,6 +685,7 @@
     {
       "id": "dockerfiles",
       "category": "infrastructure",
+      "deferred": true,
       "dependencies": [],
       "description": "Create production-ready multi-stage Dockerfiles for api, worker, and web apps. Node 24 Alpine base. Prisma client pre-generated. Run as non-root. Add .dockerignore. Verify no secrets baked into images using automated check.",
       "steps": [
@@ -404,6 +711,7 @@
     {
       "id": "docker-compose",
       "category": "infrastructure",
+      "deferred": true,
       "dependencies": ["dockerfiles"],
       "description": "Update docker-compose.yml to add api, worker, and web services with depends_on (postgres + redis healthchecks). Add .env.example documenting all required env vars.",
       "steps": [
@@ -425,6 +733,7 @@
     {
       "id": "load-test",
       "category": "validation",
+      "deferred": true,
       "dependencies": ["docker-compose"],
       "description": "Four k6 scripts in load-tests/ already exist (load, soak, spike, stress) but are untracked and untested against a running stack. This feature is complete when all four scripts are committed, pass their thresholds against the docker-compose stack, and the soak test confirms no memory leak over 2 hours.",
       "steps": [
@@ -448,6 +757,7 @@
     {
       "id": "chaos-tests",
       "category": "validation",
+      "deferred": true,
       "dependencies": ["docker-compose"],
       "description": "Create chaos test scripts with data integrity verification: Redis disconnect mid-delivery, PostgreSQL disconnect mid-write, worker crash mid-job. Verify ALL events accounted for (no data loss) and graceful recovery.",
       "steps": [
@@ -472,133 +782,9 @@
       "passes": false
     },
     {
-      "id": "dashboard-scaffolding",
-      "category": "frontend",
-      "dependencies": [],
-      "description": "Scaffold the webhook management dashboard in apps/web. Set up project layout, navigation shell, API client for the backend, and authentication context. Install Playwright for E2E testing.",
-      "steps": [
-        "Install a styling solution (e.g., Tailwind CSS) and any UI primitives needed (e.g., shadcn/ui or similar)",
-        "Create app layout with sidebar navigation: Dashboard, Endpoints, Events",
-        "Create a typed API client module (src/lib/api.ts) that calls the Fastify backend with X-Project-Key auth",
-        "Add project selection or API key configuration (settings page or env-based for MVP)",
-        "Install @playwright/test as dev dependency in apps/web",
-        "Create playwright.config.ts with webServer config pointing at Next.js dev server",
-        "Add test scripts to apps/web/package.json: test:e2e, test:e2e:ui",
-        "Create a smoke E2E test: navigate to dashboard -> verify layout renders",
-        "Run npx playwright test to verify setup works",
-        "Commit with descriptive message"
-      ],
-      "gatewayTests": [
-        "Next.js dev server starts without errors",
-        "Dashboard layout renders with navigation sidebar",
-        "Playwright smoke test passes: page loads, navigation visible",
-        "API client module exports typed methods for all backend endpoints"
-      ],
-      "passes": false
-    },
-    {
-      "id": "endpoint-list-page",
-      "category": "frontend",
-      "dependencies": ["dashboard-scaffolding", "endpoint-management"],
-      "description": "Build the Endpoints list page. Displays all webhook endpoints for the current project with their URL, created date, and event count. Links to per-endpoint event views.",
-      "steps": [
-        "Create app/endpoints/page.tsx — server component fetching endpoint list from API",
-        "Display endpoints in a table: name/ID, URL, created date, event count badge",
-        "Each row links to /endpoints/[endpointId]/events",
-        "Handle loading state and empty state (no endpoints configured)",
-        "Handle API errors with user-friendly error boundary or message",
-        "Add Playwright E2E test: verify endpoint list renders with test data",
-        "Run pnpm test and npx playwright test to verify all tests pass",
-        "Commit with descriptive message"
-      ],
-      "gatewayTests": [
-        "Endpoints page renders table with endpoint data from API",
-        "Empty state shown when no endpoints exist",
-        "Each endpoint row links to its event list page",
-        "Playwright test: navigate to /endpoints -> table visible with correct columns"
-      ],
-      "passes": false
-    },
-    {
-      "id": "event-list-page",
-      "category": "frontend",
-      "dependencies": ["dashboard-scaffolding", "event-list-endpoint"],
-      "description": "Build the Event list page for a specific endpoint. Displays paginated events with status badges (PENDING/DELIVERED/FAILED/RETRYING), idempotency key, and receivedAt timestamp. Includes replay button for FAILED events.",
-      "steps": [
-        "Create app/endpoints/[endpointId]/events/page.tsx",
-        "Fetch events from GET /webhooks/:endpointId/events with pagination",
-        "Display events in a table: eventId, status badge (color-coded), idempotencyKey, receivedAt",
-        "Add status badge component with distinct colors: PENDING (yellow), DELIVERED (green), FAILED (red), RETRYING (orange)",
-        "Implement pagination controls (next/prev or infinite scroll)",
-        "Add Replay button on FAILED event rows — calls POST .../replay, updates status optimistically",
-        "Show confirmation dialog before replay",
-        "Handle replay success (status changes to PENDING) and replay no-op (already delivered) responses",
-        "Add Playwright E2E tests: event list renders, status badges display correct colors, replay button triggers API call",
-        "Run pnpm test and npx playwright test to verify all tests pass",
-        "Commit with descriptive message"
-      ],
-      "gatewayTests": [
-        "Event list page renders with events from the API",
-        "Status badges show correct colors for each EventStatus",
-        "Pagination controls work (navigate between pages)",
-        "Replay button visible only on FAILED events",
-        "Clicking Replay on FAILED event -> confirmation dialog -> API call -> status updates to PENDING",
-        "Playwright test: full replay flow from event list to status update"
-      ],
-      "passes": false
-    },
-    {
-      "id": "event-detail-page",
-      "category": "frontend",
-      "dependencies": ["event-list-page", "event-detail-endpoint"],
-      "description": "Build the Event detail page. Shows full event payload (headers + body), delivery attempt history with status codes and durations, and a replay action for failed events.",
-      "steps": [
-        "Create app/endpoints/[endpointId]/events/[eventId]/page.tsx",
-        "Fetch event detail including headers, body, status, and delivery attempts",
-        "Display event metadata: ID, status badge, idempotencyKey, receivedAt",
-        "Display request headers and body in formatted JSON viewer (syntax-highlighted, collapsible)",
-        "Display delivery attempt timeline: attemptNumber, requestedAt, respondedAt, statusCode, duration, success/failure",
-        "Add Replay button (same behavior as event list page, with confirmation)",
-        "Add Playwright E2E test: navigate to event detail, verify payload and attempts render",
-        "Run pnpm test and npx playwright test to verify all tests pass",
-        "Commit with descriptive message"
-      ],
-      "gatewayTests": [
-        "Event detail page renders with correct event data",
-        "Headers and body displayed in formatted JSON",
-        "Delivery attempt timeline shows all attempts with status codes and durations",
-        "Replay button works for FAILED events",
-        "Playwright test: navigate to event detail from event list -> all sections render"
-      ],
-      "passes": false
-    },
-    {
-      "id": "dashboard-overview",
-      "category": "frontend",
-      "dependencies": ["dashboard-scaffolding"],
-      "description": "Build the Dashboard overview page. Displays key metrics: total events, delivery success rate, events by status breakdown, and recent failed events requiring attention.",
-      "steps": [
-        "Create app/dashboard/page.tsx (or use app/page.tsx as dashboard root)",
-        "Add summary cards: total events count, delivery success rate percentage, active endpoints count",
-        "Add status breakdown: count of events per status (PENDING, DELIVERED, FAILED, RETRYING) with visual indicators",
-        "Add recent failures list: last 10 FAILED events with endpoint name, event ID, last attempt timestamp, and quick replay action",
-        "Fetch data from existing API endpoints (events list, metrics if available)",
-        "Handle loading and error states",
-        "Add Playwright E2E test: dashboard renders with summary cards and failure list",
-        "Run pnpm test and npx playwright test to verify all tests pass",
-        "Commit with descriptive message"
-      ],
-      "gatewayTests": [
-        "Dashboard renders summary cards with numeric values from API",
-        "Status breakdown shows correct counts per status",
-        "Recent failures list shows FAILED events with replay action",
-        "Playwright test: dashboard loads, summary cards and failure list visible"
-      ],
-      "passes": false
-    },
-    {
       "id": "security-audit",
       "category": "security",
+      "deferred": true,
       "dependencies": [
         "hmac-verification",
         "rate-limiting",
