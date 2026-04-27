@@ -20,6 +20,28 @@ export interface EndpointDTO {
   createdAt: string;
 }
 
+export type EventStatus = "PENDING" | "RETRYING" | "DELIVERED" | "FAILED";
+
+export interface EventDTO {
+  id: string;
+  status: EventStatus;
+  idempotencyKey: string | null;
+  receivedAt: string;
+  method: string;
+  headers: Record<string, unknown>;
+}
+
+export interface EventListResponse {
+  events: EventDTO[];
+  nextCursor: string | null;
+}
+
+export interface ReplayResponse {
+  queued: boolean;
+  eventId?: string;
+  message?: string;
+}
+
 export interface CreateEndpointBody {
   url: string;
   name: string;
@@ -144,6 +166,56 @@ export class ApiClient {
       const err: ApiError = await res.json();
       throw new Error(err.message ?? "Failed to delete endpoint");
     }
+  }
+
+  async getEndpoint(endpointId: string): Promise<EndpointDTO> {
+    const res = await fetch(`${this.baseUrl}/endpoints/${endpointId}`, {
+      headers: this.buildHeaders(),
+    });
+    if (!res.ok) {
+      const err: ApiError = await res.json();
+      throw new Error(err.message ?? "Failed to get endpoint");
+    }
+    return res.json() as Promise<EndpointDTO>;
+  }
+
+  async listEvents(
+    endpointId: string,
+    params: { limit?: number; cursor?: string } = {}
+  ): Promise<EventListResponse> {
+    const query = new URLSearchParams();
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    if (params.cursor) query.set("cursor", params.cursor);
+    const qs = query.toString();
+    const res = await fetch(
+      `${this.baseUrl}/webhooks/${endpointId}/events${qs ? `?${qs}` : ""}`,
+      { headers: this.buildHeaders() }
+    );
+    if (!res.ok) {
+      const err: ApiError = await res.json();
+      throw new Error(err.message ?? "Failed to list events");
+    }
+    return res.json() as Promise<EventListResponse>;
+  }
+
+  async replayEvent(
+    endpointId: string,
+    eventId: string
+  ): Promise<ReplayResponse> {
+    const res = await fetch(
+      `${this.baseUrl}/webhooks/${endpointId}/events/${eventId}/replay`,
+      { method: "POST", headers: this.buildHeaders() }
+    );
+    if (res.status === 429) {
+      throw Object.assign(new Error("Rate limit: max 10 replays per minute"), {
+        statusCode: 429,
+      });
+    }
+    if (!res.ok && res.status !== 200 && res.status !== 202) {
+      const err: ApiError = await res.json();
+      throw new Error(err.message ?? "Failed to replay event");
+    }
+    return res.json() as Promise<ReplayResponse>;
   }
 }
 
