@@ -494,7 +494,7 @@
         "CopyButton copies text to clipboard and shows CheckIcon for 2 seconds",
         "apps/web can import and render Button, Card, StatusBadge from @repo/ui without errors"
       ],
-      "passes": false
+      "passes": true
     },
     {
       "id": "project-api-management",
