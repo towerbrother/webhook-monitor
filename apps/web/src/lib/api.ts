@@ -31,6 +31,21 @@ export interface EventDTO {
   headers: Record<string, unknown>;
 }
 
+export interface DeliveryAttemptDTO {
+  id: string;
+  attemptNumber: number;
+  requestedAt: string;
+  respondedAt: string | null;
+  statusCode: number | null;
+  success: boolean;
+  errorMessage: string | null;
+}
+
+export interface EventDetailDTO extends EventDTO {
+  body: unknown;
+  deliveryAttempts: DeliveryAttemptDTO[];
+}
+
 export interface EventListResponse {
   events: EventDTO[];
   nextCursor: string | null;
@@ -196,6 +211,23 @@ export class ApiClient {
       throw new Error(err.message ?? "Failed to list events");
     }
     return res.json() as Promise<EventListResponse>;
+  }
+
+  async getEvent(
+    endpointId: string,
+    eventId: string
+  ): Promise<EventDetailDTO> {
+    const res = await fetch(
+      `${this.baseUrl}/webhooks/${endpointId}/events/${eventId}`,
+      { headers: this.buildHeaders() }
+    );
+    if (!res.ok) {
+      const err: ApiError = await res.json();
+      throw Object.assign(new Error(err.message ?? "Failed to get event"), {
+        statusCode: res.status,
+      });
+    }
+    return res.json() as Promise<EventDetailDTO>;
   }
 
   async replayEvent(
