@@ -500,6 +500,7 @@
       "id": "project-api-management",
       "category": "functional",
       "dependencies": ["ui-design-system"],
+      "passes": true,
       "description": "Add project creation and listing API endpoints, plus a project switcher in the dashboard. Mimics production API-key management: users create projects via the dashboard, receive a one-time-shown project key, and store the active key in localStorage. All dashboard API calls are scoped to the active project via X-Project-Key.",
       "steps": [
         "Create apps/api/src/routes/projects.ts with POST /projects (unauthenticated): validate body (name: non-empty string), generate projectKey via crypto.randomUUID(), create Project record, return 201 with { id, name, projectKey, createdAt } — projectKey returned in full only at creation time",
@@ -525,8 +526,7 @@
         "Dashboard: create project via NewProjectDialog -> full key shown once with CopyButton -> stored in localStorage -> sidebar shows project name",
         "Switching project in dropdown updates active project context -> subsequent API calls include the new X-Project-Key",
         "Refreshing the page restores active project from localStorage"
-      ],
-      "passes": false
+      ]
     },
     {
       "id": "endpoint-management-dashboard",
