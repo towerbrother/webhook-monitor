@@ -5,6 +5,7 @@ import { APP_NAME, type HealthCheckResponse } from "@repo/shared";
 import type { Redis } from "ioredis";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { endpointRoutes } from "./routes/endpoints.js";
+import { projectRoutes } from "./routes/projects.js";
 
 export interface AppOptions {
   prisma: PrismaClient;
@@ -48,6 +49,9 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       service: `${APP_NAME}-api`,
     };
   });
+
+  // Register project routes (unauthenticated — project creation and listing)
+  await fastify.register(projectRoutes);
 
   // Register webhook routes (rate limiting is applied inside this plugin,
   // after authentication, so req.project is available for keyGenerator)
