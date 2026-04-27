@@ -22,6 +22,7 @@ export function DataTable<TData, TValue = unknown>({
   emptyState,
 }: DataTableProps<TData, TValue>) {
   "use no memo";
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable<TData>({
     data,
     columns: columns as ColumnDef<TData>[],
