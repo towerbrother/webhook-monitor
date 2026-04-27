@@ -29,6 +29,24 @@ export interface CreateEndpointBody {
 export interface ApiError {
   error: string;
   message: string;
+  details?: ValidationIssue[];
+}
+
+export interface ValidationIssue {
+  path: (string | number)[];
+  message: string;
+}
+
+export class ValidationError extends Error {
+  issues: ValidationIssue[];
+  statusCode: number;
+
+  constructor(message: string, issues: ValidationIssue[], statusCode: number) {
+    super(message);
+    this.name = "ValidationError";
+    this.issues = issues;
+    this.statusCode = statusCode;
+  }
 }
 
 export class ApiClient {
@@ -104,7 +122,14 @@ export class ApiClient {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      const err: ApiError = await res.json();
+      const err = (await res.json()) as ApiError;
+      if (res.status === 400 && err.details) {
+        throw new ValidationError(
+          err.message ?? "Validation failed",
+          err.details,
+          400
+        );
+      }
       throw new Error(err.message ?? "Failed to create endpoint");
     }
     return res.json() as Promise<EndpointDTO>;

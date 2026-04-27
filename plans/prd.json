@@ -532,6 +532,7 @@
       "id": "endpoint-management-dashboard",
       "category": "frontend",
       "dependencies": ["ui-design-system", "project-api-management"],
+      "passes": true,
       "description": "Scaffold the Next.js App Router layout with the shared design system and implement the endpoints management page as the first vertical slice. Users can see all webhook endpoints for their active project, create new ones (with optional signing secret), and delete them — all from the dashboard.",
       "steps": [
         "Update apps/web/app/layout.tsx: wrap with ProjectProvider; render PageShell from @repo/ui with SidebarNav items: [{ href: '/', label: 'Dashboard' }, { href: '/endpoints', label: 'Endpoints' }]; include ProjectSwitcher above nav items in sidebar",
