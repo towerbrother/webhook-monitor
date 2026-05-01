@@ -5,6 +5,10 @@
       "cache": false,
       "persistent": true
     },
+    "start": {
+      "cache": false,
+      "persistent": true
+    },
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
@@ -20,12 +24,12 @@
       "cache": false
     },
     "test": {
-      "dependsOn": ["^test"],
+      "dependsOn": ["^build", "^test"],
       "cache": false,
       "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "REDIS_DB", "LOG_LEVEL"]
     },
     "@repo/worker#test": {
-      "dependsOn": ["^test", "@repo/api#test"],
+      "dependsOn": ["^build", "^test", "@repo/api#test"],
       "cache": false,
       "env": ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "REDIS_DB", "LOG_LEVEL"]
     }
