@@ -50,10 +50,10 @@ function durationMs(requestedAt: string, respondedAt: string | null): string {
 
 function statusCodeColor(code: number | null): string {
   if (!code) return "bg-muted text-muted-foreground";
-  if (code >= 200 && code < 300) return "bg-green-100 text-green-800";
-  if (code >= 300 && code < 400) return "bg-blue-100 text-blue-800";
-  if (code >= 400 && code < 500) return "bg-yellow-100 text-yellow-800";
-  return "bg-red-100 text-red-800";
+  if (code >= 200 && code < 300) return "bg-http-2xx-bg text-http-2xx-fg";
+  if (code >= 300 && code < 400) return "bg-http-3xx-bg text-http-3xx-fg";
+  if (code >= 400 && code < 500) return "bg-http-4xx-bg text-http-4xx-fg";
+  return "bg-http-5xx-bg text-http-5xx-fg";
 }
 
 function HeadersTable({ headers }: { headers: Record<string, unknown> }) {
