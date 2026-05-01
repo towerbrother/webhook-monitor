@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" fill="none">
+  <g transform="translate(4 8)">
+    <path d="M3 17 L13 27 L29 7" stroke="oklch(0.208 0.042 265.755)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+  </g>
+  <text x="44" y="31" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.02em" fill="oklch(0.129 0.042 264.695)">Webhook</text>
+  <text x="133" y="31" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="400" letter-spacing="-0.02em" fill="oklch(0.554 0.046 257.417)">Monitor</text>
+</svg>

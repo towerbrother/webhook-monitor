@@ -1,12 +1,26 @@
 import type { Metadata } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ProjectProvider } from "../src/context/project-context";
 import { ProjectSwitcher } from "../src/components/project-switcher";
 import { PageShell, SidebarNav } from "@repo/ui";
 
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-inter",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-jetbrains-mono",
+});
+
 export const metadata: Metadata = {
   title: "Webhook Monitor",
   description: "Webhook monitoring and delivery system",
+  icons: { icon: "/favicon.svg" },
 };
 
 const navItems = [
@@ -20,8 +34,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="font-sans">
         <ProjectProvider>
           <PageShell
             sidebar={
