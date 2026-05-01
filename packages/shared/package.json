@@ -6,14 +6,15 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "default": "./dist/index.js"
     },
     "./dto": {
       "types": "./src/dto.ts",
-      "default": "./src/dto.ts"
+      "default": "./dist/dto.js"
     }
   },
   "scripts": {
+    "build": "tsc",
     "check-types": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0"
   },
