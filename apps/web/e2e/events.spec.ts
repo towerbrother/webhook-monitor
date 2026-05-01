@@ -28,10 +28,18 @@ test.describe("Events page", () => {
     await expect(page.getByText("Live")).toBeVisible();
 
     // Column headers present
-    await expect(page.getByRole("columnheader", { name: /event id/i })).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: /status/i })).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: /method/i })).toBeVisible();
-    await expect(page.getByRole("columnheader", { name: /received at/i })).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: /event id/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: /status/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: /method/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: /received at/i })
+    ).toBeVisible();
   });
 
   test("shows empty state when no events exist", async ({ page }) => {
@@ -48,7 +56,10 @@ test.describe("Events page", () => {
     await page.goto(href!);
 
     // Either a table with status badges OR the empty state is visible
-    const hasTable = await page.locator("table").isVisible().catch(() => false);
+    const hasTable = await page
+      .locator("table")
+      .isVisible()
+      .catch(() => false);
     const hasEmpty = await page
       .getByText("No events yet")
       .isVisible()
@@ -70,7 +81,10 @@ test.describe("Events page", () => {
     const href = await firstLink.getAttribute("href");
     await page.goto(href!);
 
-    const hasTable = await page.locator("table").isVisible().catch(() => false);
+    const hasTable = await page
+      .locator("table")
+      .isVisible()
+      .catch(() => false);
     if (!hasTable) return;
 
     // If there are non-FAILED rows, they should not have a Replay button inline

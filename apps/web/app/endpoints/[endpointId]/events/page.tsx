@@ -177,9 +177,7 @@ export default function EventsPage() {
         if (result.queued) {
           setEvents((prev) =>
             prev.map((e) =>
-              e.id === event.id
-                ? { ...e, status: "PENDING" as EventStatus }
-                : e
+              e.id === event.id ? { ...e, status: "PENDING" as EventStatus } : e
             )
           );
           showToast("Event queued for replay", "success");
@@ -196,7 +194,9 @@ export default function EventsPage() {
         showToast(
           is429
             ? "Rate limit: max 10 replays per minute"
-            : (err instanceof Error ? err.message : "Replay failed"),
+            : err instanceof Error
+              ? err.message
+              : "Replay failed",
           "error"
         );
         setReplayDialog({ event: null, open: false });
@@ -283,9 +283,7 @@ export default function EventsPage() {
           <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
             POST http://localhost:3001/webhooks/{endpointId}
           </code>
-          <CopyButton
-            text={`http://localhost:3001/webhooks/${endpointId}`}
-          />
+          <CopyButton text={`http://localhost:3001/webhooks/${endpointId}`} />
         </div>
       }
     />

@@ -95,8 +95,7 @@ export function ProjectSwitcher() {
           <div className="bg-background border rounded-lg p-6 w-80 space-y-4 shadow-lg">
             <h3 className="font-medium">Enter Project Key</h3>
             <p className="text-sm text-muted-foreground">
-              Enter the project key for{" "}
-              <strong>{promptedProject.name}</strong>
+              Enter the project key for <strong>{promptedProject.name}</strong>
             </p>
             <input
               type="password"
@@ -109,9 +108,7 @@ export function ProjectSwitcher() {
               }}
               autoFocus
             />
-            {keyError && (
-              <p className="text-destructive text-sm">{keyError}</p>
-            )}
+            {keyError && <p className="text-destructive text-sm">{keyError}</p>}
             <div className="flex gap-2 justify-end">
               <Button
                 variant="outline"

@@ -17,7 +17,10 @@ test.describe("Event detail page", () => {
     const endpointHref = await firstLink.getAttribute("href");
     await page.goto(endpointHref!);
 
-    const hasTable = await page.locator("table").isVisible().catch(() => false);
+    const hasTable = await page
+      .locator("table")
+      .isVisible()
+      .catch(() => false);
     if (!hasTable) {
       // No events — skip
       return;

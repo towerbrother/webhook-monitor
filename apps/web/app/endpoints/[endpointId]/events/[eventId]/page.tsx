@@ -43,10 +43,7 @@ function formatAbsolute(dateStr: string): string {
   return new Date(dateStr).toLocaleString();
 }
 
-function durationMs(
-  requestedAt: string,
-  respondedAt: string | null
-): string {
+function durationMs(requestedAt: string, respondedAt: string | null): string {
   if (!respondedAt) return "—";
   return `${new Date(respondedAt).getTime() - new Date(requestedAt).getTime()} ms`;
 }
@@ -59,11 +56,7 @@ function statusCodeColor(code: number | null): string {
   return "bg-red-100 text-red-800";
 }
 
-function HeadersTable({
-  headers,
-}: {
-  headers: Record<string, unknown>;
-}) {
+function HeadersTable({ headers }: { headers: Record<string, unknown> }) {
   const entries = Object.entries(headers);
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? entries : entries.slice(0, 8);
@@ -110,9 +103,7 @@ function BodyBlock({ body }: { body: unknown }) {
     return <EmptyState heading="No request body" />;
   }
   const text =
-    typeof body === "object"
-      ? JSON.stringify(body, null, 2)
-      : String(body);
+    typeof body === "object" ? JSON.stringify(body, null, 2) : String(body);
 
   return (
     <div className="space-y-2">
@@ -126,11 +117,7 @@ function BodyBlock({ body }: { body: unknown }) {
   );
 }
 
-function DeliveryAttemptRow({
-  attempt,
-}: {
-  attempt: DeliveryAttemptDTO;
-}) {
+function DeliveryAttemptRow({ attempt }: { attempt: DeliveryAttemptDTO }) {
   return (
     <div className="flex flex-col gap-1 py-3">
       <div className="flex items-center gap-3">
@@ -254,7 +241,9 @@ export default function EventDetailPage() {
         showToast(
           is429
             ? "Rate limit: max 10 replays per minute"
-            : (err instanceof Error ? err.message : "Replay failed"),
+            : err instanceof Error
+              ? err.message
+              : "Replay failed",
           "error"
         );
         setReplayOpen(false);

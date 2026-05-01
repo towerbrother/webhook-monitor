@@ -63,7 +63,9 @@ export function CreateEndpointDialog({
       await api.createEndpoint({
         name: name.trim(),
         url: url.trim(),
-        ...(signingSecret.trim() ? { signingSecret: signingSecret.trim() } : {}),
+        ...(signingSecret.trim()
+          ? { signingSecret: signingSecret.trim() }
+          : {}),
       });
       resetForm();
       onOpenChange(false);
@@ -128,7 +130,9 @@ export function CreateEndpointDialog({
           <div className="space-y-1.5">
             <Label htmlFor="endpoint-secret">
               Signing Secret{" "}
-              <span className="text-muted-foreground font-normal">(optional)</span>
+              <span className="text-muted-foreground font-normal">
+                (optional)
+              </span>
             </Label>
             <div className="flex gap-2">
               <Input
