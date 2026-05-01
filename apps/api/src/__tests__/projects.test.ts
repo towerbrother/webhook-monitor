@@ -109,7 +109,9 @@ describe.skipIf(skipTests)("POST /projects", () => {
 describe.skipIf(skipTests)("GET /projects", () => {
   it("returns all projects with masked keys", async () => {
     const prisma = getTestPrisma();
-    const project = await createTestProject(prisma, { name: "Masked Key Test" });
+    const project = await createTestProject(prisma, {
+      name: "Masked Key Test",
+    });
 
     const response = await app.inject({
       method: "GET",

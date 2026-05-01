@@ -62,9 +62,9 @@ test.describe("Endpoints page", () => {
     await page.getByLabel("Name").fill("Test");
     await page.getByLabel("URL").fill("not-a-url");
     await page.getByRole("button", { name: "Create" }).click();
-    await expect(
-      page.getByText(/valid url|invalid url/i)
-    ).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText(/valid url|invalid url/i)).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test("endpoint name links to events page", async ({ page }) => {

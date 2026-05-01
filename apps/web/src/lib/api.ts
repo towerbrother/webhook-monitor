@@ -213,10 +213,7 @@ export class ApiClient {
     return res.json() as Promise<EventListResponse>;
   }
 
-  async getEvent(
-    endpointId: string,
-    eventId: string
-  ): Promise<EventDetailDTO> {
+  async getEvent(endpointId: string, eventId: string): Promise<EventDetailDTO> {
     const res = await fetch(
       `${this.baseUrl}/webhooks/${endpointId}/events/${eventId}`,
       { headers: this.buildHeaders() }

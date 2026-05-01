@@ -51,7 +51,8 @@ export default function EndpointsPage() {
           setFetchState((prev) => ({
             ...prev,
             isLoading: false,
-            error: err instanceof Error ? err.message : "Failed to load endpoints",
+            error:
+              err instanceof Error ? err.message : "Failed to load endpoints",
           }));
         }
       });
