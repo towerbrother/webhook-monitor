@@ -597,6 +597,7 @@
       "id": "event-detail-replay-dashboard",
       "category": "frontend",
       "dependencies": ["event-monitoring-dashboard"],
+      "passes": true,
       "description": "Build the event detail page showing the full webhook request payload (headers + body), a delivery attempt timeline, and a replay action for failed events. This is the deepest level of the core user journey.",
       "steps": [
         "Create apps/web/app/endpoints/[endpointId]/events/[eventId]/page.tsx as a server component fetching GET /webhooks/:endpointId/events/:eventId; on 404 redirect to event list with error Toast",
