@@ -5,6 +5,7 @@ import { authenticateProject } from "../middleware/authenticate-project.js";
 const EndpointBodySchema = z.object({
   url: z.string().url("Must be a valid URL"),
   name: z.string().min(1, "Name must not be empty"),
+  signingSecret: z.string().optional(),
 });
 
 const EndpointParamsSchema = z.object({
@@ -32,11 +33,16 @@ export async function endpointRoutes(fastify: FastifyInstance): Promise<void> {
       });
     }
 
-    const { url, name } = validation.data;
+    const { url, name, signingSecret } = validation.data;
     const { project } = request;
 
     const endpoint = await fastify.prisma.webhookEndpoint.create({
-      data: { url, name, projectId: project.id },
+      data: {
+        url,
+        name,
+        projectId: project.id,
+        ...(signingSecret !== undefined ? { signingSecret } : {}),
+      },
       select: endpointSelect,
     });
 

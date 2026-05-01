@@ -87,3 +87,18 @@ export { SectionCard } from "./components/section-card";
 export { EmptyState } from "./components/empty-state";
 
 export { DataTable } from "./components/data-table";
+export type { ColumnDef } from "@tanstack/react-table";
+
+export {
+  AlertDialog,
+  AlertDialogPortal,
+  AlertDialogOverlay,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "./components/ui/alert-dialog";
