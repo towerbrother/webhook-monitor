@@ -19,7 +19,7 @@
     "@repo/shared": "workspace:*",
     "fastify": "^5.8.5",
     "ioredis": "^5.10.1",
-    "zod": "^4.4.1"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
